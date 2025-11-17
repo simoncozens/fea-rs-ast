@@ -309,7 +309,8 @@ impl<T: SubOrPos> AsFea for IgnoreStatement<T> {
                     s.push_str(&prefix_str.join(" ").to_string());
                     s.push(' ');
                 }
-                let glyphs_str: Vec<String> = glyphs.iter().map(|g| g.as_fea(indent) + "'").collect();
+                let glyphs_str: Vec<String> =
+                    glyphs.iter().map(|g| g.as_fea(indent) + "'").collect();
                 s.push_str(&glyphs_str.join(" "));
                 if !suffix.is_empty() {
                     s.push(' ');

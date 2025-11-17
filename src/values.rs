@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, Metric},
     Kind,
+    typed::{AstNode as _, Metric},
 };
 use smol_str::SmolStr;
 

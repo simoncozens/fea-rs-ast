@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, Tag};
 
-use crate::{from_anchor, Anchor, AsFea, GlyphClass};
+use crate::{Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, from_anchor};
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -254,7 +254,10 @@ pub struct LookupReferenceStatement {
 }
 impl LookupReferenceStatement {
     pub fn new(lookup_name: String, location: Range<usize>) -> Self {
-        Self { lookup_name, location }
+        Self {
+            lookup_name,
+            location,
+        }
     }
 }
 impl AsFea for LookupReferenceStatement {
@@ -276,7 +279,6 @@ impl From<fea_rs::typed::LookupRef> for LookupReferenceStatement {
         )
     }
 }
-    
 
 /// A ``script`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -348,7 +350,12 @@ impl LookupFlagStatement {
 impl AsFea for LookupFlagStatement {
     fn as_fea(&self, _indent: &str) -> String {
         let mut res = Vec::new();
-        let flags = ["RightToLeft", "IgnoreBaseGlyphs", "IgnoreLigatures", "IgnoreMarks"];
+        let flags = [
+            "RightToLeft",
+            "IgnoreBaseGlyphs",
+            "IgnoreLigatures",
+            "IgnoreMarks",
+        ];
         let mut curr = 1u16;
         for flag in &flags {
             if self.value & curr != 0 {
@@ -360,7 +367,10 @@ impl AsFea for LookupFlagStatement {
             res.push(format!("MarkAttachmentType {}", mark_attachment.as_fea("")));
         }
         if let Some(mark_filtering_set) = &self.mark_filtering_set {
-            res.push(format!("UseMarkFilteringSet {}", mark_filtering_set.as_fea("")));
+            res.push(format!(
+                "UseMarkFilteringSet {}",
+                mark_filtering_set.as_fea("")
+            ));
         }
         if res.is_empty() {
             res.push("0".to_string());
@@ -387,7 +397,7 @@ impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
 
         // Collect all items and process MarkAttachment and UseMarkFilteringSet
         let items: Vec<_> = val.iter().collect();
-        
+
         let mut i = 0;
         while i < items.len() {
             match items[i].kind() {
@@ -413,6 +423,56 @@ impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
         }
 
         LookupFlagStatement::new(value, mark_attachment, mark_filtering_set, val.range())
+    }
+}
+
+/// A definition of a glyph in a mark class, associating it with an anchor point.
+///
+/// See the notes for [`MarkClass`] to understand how this differs from the
+/// Python `fontTools` representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkClassDefinition {
+    mark_class: MarkClass,
+    anchor: crate::Anchor,
+    glyphs: GlyphContainer,
+}
+impl MarkClassDefinition {
+    pub fn new(mark_class: MarkClass, anchor: crate::Anchor, glyphs: GlyphContainer) -> Self {
+        Self {
+            mark_class,
+            anchor,
+            glyphs,
+        }
+    }
+}
+impl AsFea for MarkClassDefinition {
+    fn as_fea(&self, _indent: &str) -> String {
+        format!(
+            "markClass @{} {} {};",
+            self.mark_class.name,
+            self.anchor.as_fea(""),
+            self.glyphs.as_fea("")
+        )
+    }
+}
+impl From<fea_rs::typed::MarkClassDef> for MarkClassDefinition {
+    fn from(val: fea_rs::typed::MarkClassDef) -> Self {
+        // Glyphs are the first GlyphOrClass
+        let glyphs_node = val
+            .iter()
+            .find_map(fea_rs::typed::GlyphOrClass::cast)
+            .unwrap();
+        // Anchor is the first Anchor
+        let anchor_node = val.iter().find_map(fea_rs::typed::Anchor::cast).unwrap();
+        let anchor = from_anchor(anchor_node).unwrap();
+        // MarkClass name is the GlyphClassName after the anchor
+        let mark_class_node = val
+            .iter()
+            .skip_while(|t| t.kind() != fea_rs::Kind::AnchorNode)
+            .find_map(fea_rs::typed::GlyphClassName::cast)
+            .unwrap();
+        let mark_class = MarkClass::new(mark_class_node.text().trim_start_matches('@'));
+        MarkClassDefinition::new(mark_class, anchor, GlyphContainer::from(glyphs_node))
     }
 }
 
@@ -503,7 +563,10 @@ mod tests {
             None,
             0..0,
         );
-        assert_eq!(stmt.as_fea(""), "lookupflag MarkAttachmentType [acute grave];");
+        assert_eq!(
+            stmt.as_fea(""),
+            "lookupflag MarkAttachmentType [acute grave];"
+        );
     }
 
     // AnchorDefinition tests
@@ -538,7 +601,10 @@ mod tests {
         assert_eq!(stmt.y, 100);
         assert_eq!(stmt.contourpoint, Some(5));
         assert_eq!(stmt.name, "ANCHOR_1");
-        assert_eq!(stmt.as_fea(""), "anchorDef 300 100 contourpoint 5 ANCHOR_1;");
+        assert_eq!(
+            stmt.as_fea(""),
+            "anchorDef 300 100 contourpoint 5 ANCHOR_1;"
+        );
     }
 
     #[test]

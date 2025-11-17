@@ -8,7 +8,7 @@ mod miscellenea;
 mod values;
 pub use contextual::*;
 pub use fea_rs;
-use fea_rs::{typed::AstNode as _, NodeOrToken};
+use fea_rs::{NodeOrToken, typed::AstNode as _};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -37,6 +37,8 @@ pub enum Statement {
     SinglePos(SinglePosStatement),
     PairPos(PairPosStatement),
     CursivePos(CursivePosStatement),
+    MarkBasePos(MarkBasePosStatement),
+    MarkLigPos(MarkLigPosStatement),
     IgnorePos(IgnoreStatement<Pos>),
     LigatureSubst(LigatureSubstStatement),
     // Miscellenea
@@ -71,6 +73,8 @@ impl AsFea for Statement {
             Statement::SinglePos(sp) => sp.as_fea(indent),
             Statement::PairPos(pp) => pp.as_fea(indent),
             Statement::CursivePos(cp) => cp.as_fea(indent),
+            Statement::MarkBasePos(mbp) => mbp.as_fea(indent),
+            Statement::MarkLigPos(mlp) => mlp.as_fea(indent),
             Statement::ChainedContextPos(ccs) => ccs.as_fea(indent),
             Statement::IgnorePos(ip) => ip.as_fea(indent),
             // Miscellenea
@@ -120,6 +124,10 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
         Some(Statement::PairPos(gpos2.into()))
     } else if let Some(gpos3) = fea_rs::typed::Gpos3::cast(child) {
         Some(Statement::CursivePos(gpos3.into()))
+    } else if let Some(gpos4) = fea_rs::typed::Gpos4::cast(child) {
+        Some(Statement::MarkBasePos(gpos4.into()))
+    } else if let Some(gpos5) = fea_rs::typed::Gpos5::cast(child) {
+        Some(Statement::MarkLigPos(gpos5.into()))
     // Miscellenea
     } else if let Some(ad) = fea_rs::typed::AnchorDef::cast(child) {
         Some(Statement::AnchorDefinition(ad.into()))

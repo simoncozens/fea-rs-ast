@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 
 use fea_rs::typed::{AstNode as _, GlyphOrClass};
 use smol_str::SmolStr;
@@ -197,5 +197,36 @@ impl From<fea_rs::typed::GlyphClass> for GlyphContainer {
                 ))
             }
         }
+    }
+}
+
+/// The name of a mark class
+///
+/// Note that this differs from the Python `fontTools` representation. In
+/// Python, a `MarkClass` object contains `MarkClassDefinition` objects
+/// for the glyphs in the class, and the `MarkClassDefinition` objects
+/// recursively refer to the `MarkClass` they belong to. In Rust, the
+/// `MarkClass` is just a name, and the relationship between the class name
+/// and the glyphs and their anchor points is stored at the feature file level.
+///
+/// The name should not begin with `@`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MarkClass {
+    pub name: SmolStr,
+}
+impl MarkClass {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: SmolStr::new(name),
+        }
+    }
+}
+impl From<fea_rs::typed::GlyphClassDef> for MarkClass {
+    fn from(val: fea_rs::typed::GlyphClassDef) -> Self {
+        let label = val
+            .iter()
+            .find_map(fea_rs::typed::GlyphClassName::cast)
+            .unwrap();
+        MarkClass::new(label.text().trim_start_matches('@'))
     }
 }

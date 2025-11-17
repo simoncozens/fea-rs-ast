@@ -1,11 +1,11 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
-use crate::{from_anchor, Anchor, AsFea, GlyphContainer, ValueRecord};
+use crate::{Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord, from_anchor};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
@@ -221,6 +221,189 @@ impl From<fea_rs::typed::Gpos3> for CursivePosStatement {
     }
 }
 
+/// A mark-to-base positioning rule (GPOS type 4)
+///
+/// Example: `pos base a <anchor 625 1800> mark @TOP_MARKS;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkBasePosStatement {
+    pub base: GlyphContainer,
+    pub marks: Vec<(Anchor, MarkClass)>,
+    pub location: Range<usize>,
+}
+
+/// A mark-to-ligature positioning rule (GPOS type 5)
+///
+/// The `marks` field is a list of lists: each element represents a component glyph,
+/// and is made up of a list of (Anchor, MarkClass) tuples for that component.
+///
+/// Example: `pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkLigPosStatement {
+    pub ligatures: GlyphContainer,
+    pub marks: Vec<Vec<(Anchor, MarkClass)>>,
+    pub location: Range<usize>,
+}
+
+impl MarkBasePosStatement {
+    pub fn new(
+        base: GlyphContainer,
+        marks: Vec<(Anchor, MarkClass)>,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            base,
+            marks,
+            location,
+        }
+    }
+}
+
+impl AsFea for MarkBasePosStatement {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = format!("pos base {}", self.base.as_fea(""));
+        for (anchor, mark_class) in &self.marks {
+            res.push_str(&format!(
+                "\n{}    {} mark @{}",
+                indent,
+                anchor.as_fea(""),
+                mark_class.name
+            ));
+        }
+        res.push(';');
+        res
+    }
+}
+
+impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
+    fn from(val: fea_rs::typed::Gpos4) -> Self {
+        // Extract base glyph (it's after "pos" keyword and "base" keyword)
+        let base: GlyphContainer = val
+            .iter()
+            .filter(|t| t.kind() != Kind::Whitespace)
+            .nth(2) // Skip "pos" and "base" keywords
+            .and_then(GlyphOrClass::cast)
+            .unwrap()
+            .into();
+
+        // Extract all AnchorMark nodes (after the base glyph)
+        let marks: Vec<(Anchor, MarkClass)> = val
+            .iter()
+            .filter_map(fea_rs::typed::AnchorMark::cast)
+            .map(|anchor_mark| {
+                // Get the anchor from the AnchorMark node
+                let anchor_node = anchor_mark
+                    .iter()
+                    .find_map(fea_rs::typed::Anchor::cast)
+                    .unwrap();
+                let anchor = from_anchor(anchor_node).unwrap();
+
+                // Get the mark class name (it's a @GlyphClass token)
+                let mark_class_node = anchor_mark
+                    .iter()
+                    .find_map(fea_rs::typed::GlyphClassName::cast)
+                    .unwrap();
+                let mark_class_name = mark_class_node.text().trim_start_matches('@');
+                let mark_class = MarkClass::new(mark_class_name);
+
+                (anchor, mark_class)
+            })
+            .collect();
+
+        MarkBasePosStatement::new(base, marks, val.range())
+    }
+}
+
+impl MarkLigPosStatement {
+    pub fn new(
+        ligatures: GlyphContainer,
+        marks: Vec<Vec<(Anchor, MarkClass)>>,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            ligatures,
+            marks,
+            location,
+        }
+    }
+}
+
+impl AsFea for MarkLigPosStatement {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = format!("pos ligature {}", self.ligatures.as_fea(""));
+
+        // Format each ligature component
+        let mut ligs = Vec::new();
+        for component in &self.marks {
+            if component.is_empty() {
+                // Empty component gets NULL anchor
+                ligs.push(format!("\n{}    <anchor NULL>", indent));
+            } else {
+                let mut temp = String::new();
+                for (anchor, mark_class) in component {
+                    temp.push_str(&format!(
+                        "\n{}    {} mark @{}",
+                        indent,
+                        anchor.as_fea(""),
+                        mark_class.name
+                    ));
+                }
+                ligs.push(temp);
+            }
+        }
+
+        // Join components with "ligComponent" keyword (but not before first)
+        res.push_str(&ligs.join(&format!("\n{}    ligComponent", indent)));
+        res.push(';');
+        res
+    }
+}
+
+impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
+    fn from(val: fea_rs::typed::Gpos5) -> Self {
+        // Extract ligature glyph (it's after "pos" keyword and "ligature" keyword)
+        let ligatures: GlyphContainer = val
+            .iter()
+            .filter(|t| t.kind() != Kind::Whitespace)
+            .nth(2) // Skip "pos" and "ligature" keywords
+            .and_then(GlyphOrClass::cast)
+            .unwrap()
+            .into();
+
+        // Extract all LigatureComponent nodes
+        let marks: Vec<Vec<(Anchor, MarkClass)>> = val
+            .iter()
+            .filter_map(fea_rs::typed::LigatureComponent::cast)
+            .map(|lig_component| {
+                // Extract all AnchorMark nodes within this component
+                lig_component
+                    .iter()
+                    .filter_map(fea_rs::typed::AnchorMark::cast)
+                    .map(|anchor_mark| {
+                        // Get the anchor from the AnchorMark node
+                        let anchor_node = anchor_mark
+                            .iter()
+                            .find_map(fea_rs::typed::Anchor::cast)
+                            .unwrap();
+                        let anchor = from_anchor(anchor_node).unwrap();
+
+                        // Get the mark class name (it's a @GlyphClass token)
+                        let mark_class_node = anchor_mark
+                            .iter()
+                            .find_map(fea_rs::typed::GlyphClassName::cast)
+                            .unwrap();
+                        let mark_class_name = mark_class_node.text().trim_start_matches('@');
+                        let mark_class = MarkClass::new(mark_class_name);
+
+                        (anchor, mark_class)
+                    })
+                    .collect()
+            })
+            .collect();
+
+        MarkLigPosStatement::new(ligatures, marks, val.range())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::GlyphName;
@@ -355,6 +538,99 @@ mod tests {
         assert_eq!(
             fea_str_roundtrip,
             "pos cursive A <anchor 100 200> <anchor 150 250>;"
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_gpos4() {
+        const FEA: &str = "feature mark { pos base a <anchor 625 1800> mark @TOP_MARKS; } mark;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let gpos4 = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::Feature::cast)
+            .and_then(|feature| {
+                feature
+                    .node()
+                    .iter_children()
+                    .find_map(fea_rs::typed::Gpos4::cast)
+            })
+            .unwrap();
+        let stmt = MarkBasePosStatement::from(gpos4);
+        assert_eq!(stmt.base.as_fea(""), "a");
+        assert_eq!(stmt.marks.len(), 1);
+        assert_eq!(stmt.marks[0].1.name, "TOP_MARKS");
+        assert_eq!(
+            stmt.as_fea(""),
+            "pos base a\n    <anchor 625 1800> mark @TOP_MARKS;"
+        );
+    }
+
+    #[test]
+    fn test_generation_gpos4() {
+        let stmt = MarkBasePosStatement::new(
+            GlyphContainer::GlyphName(GlyphName::new("a")),
+            vec![
+                (
+                    Anchor::new_simple(300, 450, 0..0),
+                    MarkClass::new("TOP_MARKS"),
+                ),
+                (
+                    Anchor::new_simple(300, -100, 0..0),
+                    MarkClass::new("BOTTOM_MARKS"),
+                ),
+            ],
+            0..0,
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "pos base a\n    <anchor 300 450> mark @TOP_MARKS\n    <anchor 300 -100> mark @BOTTOM_MARKS;"
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_gpos5() {
+        const FEA: &str = "feature test { pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS; } test;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let gpos5 = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::Feature::cast)
+            .and_then(|feature| {
+                feature
+                    .node()
+                    .iter_children()
+                    .find_map(fea_rs::typed::Gpos5::cast)
+            })
+            .unwrap();
+        let gpos5_stmt: MarkLigPosStatement = gpos5.into();
+        let fea_str_roundtrip = gpos5_stmt.as_fea("");
+        assert_eq!(
+            fea_str_roundtrip,
+            "pos ligature lam_meem_jeem\n    <anchor 625 1800> mark @TOP_MARKS\n    ligComponent\n    <anchor 376 -378> mark @BOTTOM_MARKS;"
+        );
+    }
+
+    #[test]
+    fn test_generate_gpos5() {
+        let stmt = MarkLigPosStatement::new(
+            GlyphContainer::GlyphName(GlyphName::new("lam_meem_jeem")),
+            vec![
+                vec![(
+                    Anchor::new_simple(625, 1800, 0..0),
+                    MarkClass::new("TOP_MARKS"),
+                )],
+                vec![(
+                    Anchor::new_simple(376, -378, 0..0),
+                    MarkClass::new("BOTTOM_MARKS"),
+                )],
+                vec![], // Empty component (NULL anchor)
+            ],
+            0..0,
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "pos ligature lam_meem_jeem\n    <anchor 625 1800> mark @TOP_MARKS\n    ligComponent\n    <anchor 376 -378> mark @BOTTOM_MARKS\n    ligComponent\n    <anchor NULL>;"
         );
     }
 }

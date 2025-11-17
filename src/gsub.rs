@@ -1,6 +1,6 @@
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
 use crate::contextual::{backtrack, context_glyphs, lookahead};
