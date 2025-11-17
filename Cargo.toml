@@ -1,0 +1,9 @@
+[package]
+name = "fea-rs-ast"
+version = "0.1.0"
+edition = "2024"
+description = "fontTools-like AST wrapper around fea-rs parser"
+
+[dependencies]
+fea-rs = { git = "https://github.com/googlefonts/fontc/", branch = "edit-edits" }
+smol_str = "0.3.4"
