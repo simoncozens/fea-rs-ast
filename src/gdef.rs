@@ -46,6 +46,98 @@ impl From<fea_rs::typed::GdefAttach> for AttachStatement {
     }
 }
 
+/// A ``GDEF`` table ``GlyphClassDef`` statement
+///
+/// Example: ``GlyphClassDef [a b c], [f_f_i f_f_l], [acute grave], [n.sc t.sc];``
+/// Or with named classes: ``GlyphClassDef @BASE, @LIGATURES, @MARKS, @COMPONENT;``
+///
+/// The four parameters represent base glyphs, ligature glyphs, mark glyphs,
+/// and component glyphs respectively. Any parameter can be None.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlyphClassDefStatement {
+    pub base_glyphs: Option<GlyphContainer>,
+    pub ligature_glyphs: Option<GlyphContainer>,
+    pub mark_glyphs: Option<GlyphContainer>,
+    pub component_glyphs: Option<GlyphContainer>,
+    pub location: Range<usize>,
+}
+
+impl GlyphClassDefStatement {
+    pub fn new(
+        base_glyphs: Option<GlyphContainer>,
+        ligature_glyphs: Option<GlyphContainer>,
+        mark_glyphs: Option<GlyphContainer>,
+        component_glyphs: Option<GlyphContainer>,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            base_glyphs,
+            ligature_glyphs,
+            mark_glyphs,
+            component_glyphs,
+            location,
+        }
+    }
+}
+
+impl AsFea for GlyphClassDefStatement {
+    fn as_fea(&self, _indent: &str) -> String {
+        let base = self
+            .base_glyphs
+            .as_ref()
+            .map(|g| g.as_fea(""))
+            .unwrap_or_default();
+        let liga = self
+            .ligature_glyphs
+            .as_ref()
+            .map(|g| g.as_fea(""))
+            .unwrap_or_default();
+        let mark = self
+            .mark_glyphs
+            .as_ref()
+            .map(|g| g.as_fea(""))
+            .unwrap_or_default();
+        let comp = self
+            .component_glyphs
+            .as_ref()
+            .map(|g| g.as_fea(""))
+            .unwrap_or_default();
+        format!("GlyphClassDef {}, {}, {}, {};", base, liga, mark, comp)
+    }
+}
+
+impl From<fea_rs::typed::GdefClassDef> for GlyphClassDefStatement {
+    fn from(val: fea_rs::typed::GdefClassDef) -> Self {
+        // Extract the 4 glyph class entries in order: base, ligature, mark, component
+        let mut entries = val
+            .iter()
+            .filter(|t| t.kind() == fea_rs::Kind::GdefClassDefEntryNode)
+            .filter_map(fea_rs::typed::GdefClassDefEntry::cast);
+
+        // Helper to extract GlyphContainer from an entry (handles both literal classes and named class references)
+        let extract_container =
+            |entry: fea_rs::typed::GdefClassDefEntry| -> Option<GlyphContainer> {
+                entry
+                    .iter()
+                    .find_map(fea_rs::typed::GlyphOrClass::cast)
+                    .map(Into::into)
+            };
+
+        let base_glyphs = entries.next().and_then(extract_container);
+        let ligature_glyphs = entries.next().and_then(extract_container);
+        let mark_glyphs = entries.next().and_then(extract_container);
+        let component_glyphs = entries.next().and_then(extract_container);
+
+        GlyphClassDefStatement::new(
+            base_glyphs,
+            ligature_glyphs,
+            mark_glyphs,
+            component_glyphs,
+            val.range(),
+        )
+    }
+}
+
 /// A ``GDEF`` table ``LigatureCaretByIndex`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureCaretByIndexStatement {
@@ -243,5 +335,76 @@ mod tests {
             0..0,
         );
         assert_eq!(stmt.as_fea(""), "Attach acutecomb 3 5 7;");
+    }
+
+    #[test]
+    fn test_roundtrip_glyphclassdef() {
+        const FEA: &str = "table GDEF { GlyphClassDef [a b c], [f_f_i], [acute grave], ; } GDEF;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let gdef_table = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::GdefTable::cast)
+            .unwrap();
+        let class_def = gdef_table
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::GdefClassDef::cast)
+            .unwrap();
+
+        let stmt = GlyphClassDefStatement::from(class_def);
+        assert!(stmt.base_glyphs.is_some());
+        assert!(stmt.ligature_glyphs.is_some());
+        assert!(stmt.mark_glyphs.is_some());
+        assert!(stmt.component_glyphs.is_none());
+        assert_eq!(
+            stmt.as_fea(""),
+            "GlyphClassDef [a b c], [f_f_i], [acute grave], ;"
+        );
+    }
+
+    #[test]
+    fn test_generation_glyphclassdef() {
+        let stmt = GlyphClassDefStatement::new(
+            Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                vec![GlyphContainer::GlyphName(GlyphName::new("a"))],
+                0..0,
+            ))),
+            None,
+            Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                vec![GlyphContainer::GlyphName(GlyphName::new("acutecomb"))],
+                0..0,
+            ))),
+            None,
+            0..0,
+        );
+        assert_eq!(stmt.as_fea(""), "GlyphClassDef [a], , [acutecomb], ;");
+    }
+
+    #[test]
+    fn test_roundtrip_glyphclassdef_named_classes() {
+        const FEA: &str =
+            "table GDEF { GlyphClassDef @BASE, @LIGATURES, @MARKS, @COMPONENT; } GDEF;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let gdef_table = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::GdefTable::cast)
+            .unwrap();
+        let class_def = gdef_table
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::GdefClassDef::cast)
+            .unwrap();
+
+        let stmt = GlyphClassDefStatement::from(class_def);
+        assert!(stmt.base_glyphs.is_some());
+        assert!(stmt.ligature_glyphs.is_some());
+        assert!(stmt.mark_glyphs.is_some());
+        assert!(stmt.component_glyphs.is_some());
+        assert_eq!(
+            stmt.as_fea(""),
+            "GlyphClassDef @BASE, @LIGATURES, @MARKS, @COMPONENT;"
+        );
     }
 }

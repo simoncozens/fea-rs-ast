@@ -42,6 +42,7 @@ pub enum Statement {
     // Miscellenea
     AnchorDefinition(AnchorDefinition),
     Attach(AttachStatement),
+    GlyphClassDef(GlyphClassDefStatement),
     LigatureCaretByIndex(LigatureCaretByIndexStatement),
     LigatureCaretByPos(LigatureCaretByPosStatement),
     Comment(Comment),
@@ -75,6 +76,7 @@ impl AsFea for Statement {
             // Miscellenea
             Statement::AnchorDefinition(ad) => ad.as_fea(indent),
             Statement::Attach(at) => at.as_fea(indent),
+            Statement::GlyphClassDef(gcd) => gcd.as_fea(indent),
             Statement::LigatureCaretByIndex(lc) => lc.as_fea(indent),
             Statement::LigatureCaretByPos(lc) => lc.as_fea(indent),
             Statement::Comment(c) => c.as_fea(indent),
@@ -123,6 +125,8 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
         Some(Statement::AnchorDefinition(ad.into()))
     } else if let Some(at) = fea_rs::typed::GdefAttach::cast(child) {
         Some(Statement::Attach(at.into()))
+    } else if let Some(gcd) = fea_rs::typed::GdefClassDef::cast(child) {
+        Some(Statement::GlyphClassDef(gcd.into()))
     } else if let Some(lc) = fea_rs::typed::GdefLigatureCaret::cast(child) {
         // Check if it's by position or by index based on the first keyword
         let is_by_pos = lc
