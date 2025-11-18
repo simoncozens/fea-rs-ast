@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, Tag};
 
-use crate::{from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass};
+use crate::{Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, from_anchor};
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -138,6 +138,7 @@ pub enum GlyphContainer {
     GlyphName(GlyphName),
     GlyphClass(GlyphClass),
     GlyphClassName(SmolStr),
+    GlyphRange(Range<SmolStr>),
 }
 
 impl AsFea for GlyphContainer {
@@ -155,6 +156,9 @@ impl AsFea for GlyphContainer {
                     name.to_string()
                 }
             }
+            GlyphContainer::GlyphRange(range) => {
+                format!("{} - {}", range.start.as_str(), range.end.as_str())
+            }
         }
     }
 }
@@ -163,14 +167,36 @@ impl From<fea_rs::typed::GlyphOrClass> for GlyphContainer {
     fn from(val: fea_rs::typed::GlyphOrClass) -> Self {
         match val {
             GlyphOrClass::Glyph(glyph) => GlyphContainer::GlyphName(GlyphName::new(glyph.text())),
-            GlyphOrClass::Class(class) => {
-                let members: Vec<GlyphContainer> = class
+            GlyphOrClass::Class(glyph_class_literal) => {
+                let members: Vec<GlyphContainer> = glyph_class_literal
                     .node()
                     .iter_children()
-                    .filter_map(GlyphOrClass::cast)
-                    .map(|goc| goc.into())
+                    .flat_map(|child| {
+                        if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
+                            Some(gc.into())
+                        } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
+                            let start = gr
+                                .iter()
+                                .find_map(fea_rs::typed::GlyphName::cast)
+                                .map(|gn| SmolStr::new(gn.text()))
+                                .unwrap();
+                            let end = gr
+                                .iter()
+                                .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
+                                .find_map(fea_rs::typed::GlyphName::cast)
+                                .map(|gn| SmolStr::new(gn.text()))
+                                .unwrap();
+
+                            Some(GlyphContainer::GlyphRange(start..end))
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
-                GlyphContainer::GlyphClass(GlyphClass::new(members, class.node().range()))
+                GlyphContainer::GlyphClass(GlyphClass::new(
+                    members,
+                    glyph_class_literal.node().range(),
+                ))
             }
             GlyphOrClass::Cid(cid) => todo!(),
             GlyphOrClass::NamedClass(glyph_class_name) => {
@@ -191,8 +217,27 @@ impl From<fea_rs::typed::GlyphClass> for GlyphContainer {
                 let members: Vec<GlyphContainer> = glyph_class_literal
                     .node()
                     .iter_children()
-                    .filter_map(GlyphOrClass::cast)
-                    .map(|goc| goc.into())
+                    .flat_map(|child| {
+                        if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
+                            Some(gc.into())
+                        } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
+                            let start = gr
+                                .iter()
+                                .find_map(fea_rs::typed::GlyphName::cast)
+                                .map(|gn| SmolStr::new(gn.text()))
+                                .unwrap();
+                            let end = gr
+                                .iter()
+                                .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
+                                .find_map(fea_rs::typed::GlyphName::cast)
+                                .map(|gn| SmolStr::new(gn.text()))
+                                .unwrap();
+
+                            Some(GlyphContainer::GlyphRange(start..end))
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
                 GlyphContainer::GlyphClass(GlyphClass::new(
                     members,

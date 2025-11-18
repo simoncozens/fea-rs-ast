@@ -5,16 +5,18 @@ mod glyphcontainers;
 mod gpos;
 mod gsub;
 mod miscellenea;
+mod name;
 mod tables;
 mod values;
 pub use contextual::*;
 pub use fea_rs;
-use fea_rs::{typed::AstNode as _, NodeOrToken, ParseTree};
+use fea_rs::{NodeOrToken, ParseTree, typed::AstNode as _};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
 pub use gsub::*;
 pub use miscellenea::*;
+pub use name::*;
 use smol_str::SmolStr;
 pub use tables::*;
 pub use values::*;
@@ -63,8 +65,10 @@ pub enum Statement {
     Subtable(SubtableStatement),
     Script(ScriptStatement),
     // Tables and blocks
-    Gdef(GdefTable),
-    Head(HeadTable),
+    Gdef(Table<Gdef>),
+    Head(Table<Head>),
+    Name(Table<Name>),
+    Stat(Table<Stat>),
     FeatureBlock(FeatureBlock),
     LookupBlock(LookupBlock),
 }
@@ -109,6 +113,8 @@ impl AsFea for Statement {
             // Tables and blocks
             Statement::Gdef(gdef) => gdef.as_fea(indent),
             Statement::Head(head) => head.as_fea(indent),
+            Statement::Name(name) => name.as_fea(indent),
+            Statement::Stat(stat) => stat.as_fea(indent),
             Statement::FeatureBlock(fb) => fb.as_fea(indent),
             Statement::LookupBlock(lb) => lb.as_fea(indent),
         }
@@ -338,8 +344,10 @@ pub enum ToplevelItem {
     AnchorDefinition(AnchorDefinition),
     // BAS
     // GDEF table
-    GdefTable(GdefTable),
-    Head(HeadTable),
+    Gdef(Table<Gdef>),
+    Head(Table<Head>),
+    Name(Table<Name>),
+    Stat(Table<Stat>),
 }
 impl From<ToplevelItem> for Statement {
     fn from(val: ToplevelItem) -> Self {
@@ -352,7 +360,9 @@ impl From<ToplevelItem> for Statement {
             ToplevelItem::Lookup(lb) => Statement::LookupBlock(lb),
             ToplevelItem::Comment(cmt) => Statement::Comment(cmt),
             ToplevelItem::AnchorDefinition(ad) => Statement::AnchorDefinition(ad),
-            ToplevelItem::GdefTable(gdef) => Statement::Gdef(gdef),
+            ToplevelItem::Name(name) => Statement::Name(name),
+            ToplevelItem::Stat(stat) => Statement::Stat(stat),
+            ToplevelItem::Gdef(gdef) => Statement::Gdef(gdef),
             ToplevelItem::Head(head) => Statement::Head(head),
         }
     }
@@ -367,7 +377,9 @@ impl AsFea for ToplevelItem {
             ToplevelItem::Lookup(lb) => lb.as_fea(indent),
             ToplevelItem::Comment(cmt) => cmt.as_fea(indent),
             ToplevelItem::AnchorDefinition(ad) => ad.as_fea(indent),
-            ToplevelItem::GdefTable(gdef) => gdef.as_fea(indent),
+            ToplevelItem::Gdef(gdef) => gdef.as_fea(indent),
+            ToplevelItem::Name(name) => name.as_fea(indent),
+            ToplevelItem::Stat(stat) => stat.as_fea(indent),
             ToplevelItem::Head(head) => head.as_fea(indent),
         }
     }
@@ -391,9 +403,13 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
     } else if let Some(ad) = fea_rs::typed::AnchorDef::cast(child) {
         Some(ToplevelItem::AnchorDefinition(ad.into()))
     } else if let Some(gdef) = fea_rs::typed::GdefTable::cast(child) {
-        Some(ToplevelItem::GdefTable(gdef.into()))
+        Some(ToplevelItem::Gdef(gdef.into()))
     } else if let Some(head) = fea_rs::typed::HeadTable::cast(child) {
         Some(ToplevelItem::Head(head.into()))
+    } else if let Some(name) = fea_rs::typed::NameTable::cast(child) {
+        Some(ToplevelItem::Name(name.into()))
+    } else if let Some(stat) = fea_rs::typed::StatTable::cast(child) {
+        Some(ToplevelItem::Stat(stat.into()))
     } else {
         None
     }

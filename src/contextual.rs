@@ -172,7 +172,8 @@ impl From<fea_rs::typed::Gsub6> for Statement {
             .find_map(fea_rs::typed::InlineSubRule::cast)
         else {
             panic!(
-                "No LookRefNode or InlineSubNode found in Gsub6, can't get here, fea-rs has failed me"
+                "No LookRefNode or InlineSubNode found in Gsub6, can't get here, fea-rs has failed me: {}",
+                val.node().iter_tokens().map(|t| t.text.clone()).collect::<Vec<_>>().join("")
             );
         };
         let target_glyphs = inline_sub
@@ -380,7 +381,6 @@ impl From<GsubIgnore> for IgnoreStatement<Subst> {
         }
     }
 }
-
 
 impl From<GposIgnore> for IgnoreStatement<Pos> {
     fn from(val: GposIgnore) -> Self {

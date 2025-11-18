@@ -1,11 +1,11 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
-use crate::{from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord};
+use crate::{Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord, from_anchor};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
@@ -575,7 +575,7 @@ mod tests {
             0..10,
         );
         let fea_str = gpos2.as_fea("");
-        assert_eq!(fea_str, "pos A B 50 30;");
+        assert_eq!(fea_str, "pos A 50 B 30;");
     }
 
     #[test]

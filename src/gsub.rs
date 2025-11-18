@@ -1,6 +1,6 @@
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
 use crate::contextual::{backtrack, context_glyphs, lookahead};
@@ -431,9 +431,9 @@ impl AsFea for ReverseChainSingleSubstStatement {
         res.push_str("rsub ");
         if !self.prefix.is_empty() || !self.suffix.is_empty() {
             if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&format!("{} ", prefix_str.join(" ")));
+                let prefix_str: Vec<String> = self.prefix.iter().map(|g| g.as_fea("")).collect();
+                res.push_str(prefix_str.join(" ").as_str());
+                res.push(' ');
             }
             let glyphs_str: Vec<String> = self
                 .glyphs
@@ -442,8 +442,9 @@ impl AsFea for ReverseChainSingleSubstStatement {
                 .collect();
             res.push_str(&glyphs_str.join(" "));
             if !self.suffix.is_empty() {
+                res.push(' ');
                 let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&format!(" {}", suffix_str.join(" ")));
+                res.push_str(suffix_str.join(" ").as_str());
             }
         } else {
             let glyphs_str: Vec<String> = self.glyphs.iter().map(|g| g.as_fea("")).collect();
@@ -681,7 +682,7 @@ mod tests {
         assert_eq!(stmt.replacements[0].as_fea(""), "b");
         assert_eq!(stmt.prefix.len(), 2);
         assert_eq!(stmt.suffix.len(), 2);
-        assert_eq!(stmt.as_fea(""), "rsub x  y  a' z w by b;");
+        assert_eq!(stmt.as_fea(""), "rsub x y a' z w by b;");
     }
 
     #[test]

@@ -8,24 +8,31 @@ use smol_str::SmolStr;
 
 use crate::AsFea;
 
+type DeviceTable = Vec<(u8, i8)>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecord {
     pub x_placement: Option<i16>,
     pub y_placement: Option<i16>,
     pub x_advance: Option<i16>,
     pub y_advance: Option<i16>,
-    pub x_placement_device: Option<SmolStr>, // will change
-    pub y_placement_device: Option<SmolStr>,
-    pub x_advance_device: Option<SmolStr>,
-    pub y_advance_device: Option<SmolStr>,
+    pub x_placement_device: Option<DeviceTable>,
+    pub y_placement_device: Option<DeviceTable>,
+    pub x_advance_device: Option<DeviceTable>,
+    pub y_advance_device: Option<DeviceTable>,
     pub vertical: bool,
     pub location: Range<usize>,
 }
 
-fn device_to_string(device: &Option<SmolStr>) -> String {
+fn device_to_string(device: &Option<DeviceTable>) -> String {
     match device {
-        Some(d) => d.to_string(),
-        None => "0".to_string(),
+        Some(d) => format!(
+            "<device {}>",
+            d.iter()
+                .map(|(ppem, delta)| format!("{} {}", ppem, delta))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        None => "<device NULL>".to_string(),
     }
 }
 
@@ -36,10 +43,10 @@ impl ValueRecord {
         y_placement: Option<i16>,
         x_advance: Option<i16>,
         y_advance: Option<i16>,
-        x_placement_device: Option<SmolStr>,
-        y_placement_device: Option<SmolStr>,
-        x_advance_device: Option<SmolStr>,
-        y_advance_device: Option<SmolStr>,
+        x_placement_device: Option<DeviceTable>,
+        y_placement_device: Option<DeviceTable>,
+        x_advance_device: Option<DeviceTable>,
+        y_advance_device: Option<DeviceTable>,
         vertical: bool,
         location: Range<usize>,
     ) -> Self {
@@ -199,17 +206,57 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
             let y_placement = numbers[1].token_text().unwrap().parse::<i16>().unwrap();
             let x_advance = numbers[2].token_text().unwrap().parse::<i16>().unwrap();
             let y_advance = numbers[3].token_text().unwrap().parse::<i16>().unwrap();
-            return Self::new_format_b(
-                x_placement,
-                y_placement,
-                x_advance,
-                y_advance,
+            let devices = val
+                .iter()
+                .filter_map(fea_rs::typed::Device::cast)
+                .flat_map(from_device)
+                .collect::<Vec<_>>();
+            if devices.is_empty() {
+                return Self::new_format_b(
+                    x_placement,
+                    y_placement,
+                    x_advance,
+                    y_advance,
+                    false,
+                    val.node().range(),
+                );
+            }
+            let x_pla_device = devices.get(0).cloned();
+            let y_pla_device = devices.get(1).cloned();
+            let x_adv_device = devices.get(2).cloned();
+            let y_adv_device = devices.get(3).cloned();
+            return Self::new(
+                Some(x_placement),
+                Some(y_placement),
+                Some(x_advance),
+                Some(y_advance),
+                x_pla_device,
+                y_pla_device,
+                x_adv_device,
+                y_adv_device,
                 false,
                 val.node().range(),
             );
         }
         panic!("Invalid ValueRecord format");
     }
+}
+
+fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
+    let mut table = Vec::new();
+    let numbers = device
+        .iter()
+        .filter_map(fea_rs::typed::Number::cast)
+        .collect::<Vec<_>>();
+    for chunk in numbers.chunks(2) {
+        if chunk.len() == 2 {
+            let ppem = chunk[0].token().as_str().parse::<u8>().unwrap();
+            let delta = chunk[1].token().as_str().parse::<i8>().unwrap();
+            table.push((ppem, delta));
+        }
+    }
+
+    if table.is_empty() { None } else { Some(table) }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.
@@ -222,8 +269,8 @@ pub struct Anchor {
     pub y: i16,
     pub name: Option<SmolStr>,
     pub contourpoint: Option<u16>,
-    pub x_device_table: Option<SmolStr>,
-    pub y_device_table: Option<SmolStr>,
+    pub x_device_table: Option<DeviceTable>,
+    pub y_device_table: Option<DeviceTable>,
     pub location: Range<usize>,
 }
 
@@ -233,8 +280,8 @@ impl Anchor {
         y: i16,
         name: Option<SmolStr>,
         contourpoint: Option<u16>,
-        x_device_table: Option<SmolStr>,
-        y_device_table: Option<SmolStr>,
+        x_device_table: Option<DeviceTable>,
+        y_device_table: Option<DeviceTable>,
         location: Range<usize>,
     ) -> Self {
         Self {
@@ -325,13 +372,20 @@ pub(crate) fn from_anchor(val: fea_rs::typed::Anchor) -> Option<Anchor> {
         .skip_while(|x| x.kind() != Kind::ContourpointKw)
         .find_map(fea_rs::typed::Number::cast)
         .map(|n| n.token().as_str().parse::<u16>().unwrap());
+    // Extract device tables if any
+    let mut devices = val
+        .iter()
+        .filter_map(fea_rs::typed::Device::cast)
+        .flat_map(from_device);
+    let x_device_table = devices.next();
+    let y_device_table = devices.next();
     Some(Anchor {
         x,
         y,
         name: None,
         contourpoint,
-        x_device_table: None,
-        y_device_table: None,
+        x_device_table,
+        y_device_table,
         location: val.node().range(),
     })
 }
