@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, GlyphOrClass};
 use smol_str::SmolStr;
@@ -111,12 +111,15 @@ impl AsFea for GlyphClass {
 }
 impl From<fea_rs::typed::GlyphClass> for GlyphClass {
     fn from(val: fea_rs::typed::GlyphClass) -> Self {
-        let members: Vec<GlyphContainer> = val
-            .iter()
-            .filter_map(GlyphOrClass::cast)
-            .map(|goc| goc.into())
-            .collect();
-        GlyphClass::new(members, val.range())
+        match val {
+            fea_rs::typed::GlyphClass::Named(glyph_class_name) => {
+                let members = vec![GlyphContainer::GlyphClassName(SmolStr::new(
+                    glyph_class_name.text(),
+                ))];
+                GlyphClass::new(members, glyph_class_name.range())
+            }
+            fea_rs::typed::GlyphClass::Literal(glyph_class_literal) => glyph_class_literal.into(),
+        }
     }
 }
 impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
@@ -173,7 +176,7 @@ impl From<fea_rs::typed::GlyphOrClass> for GlyphContainer {
             GlyphOrClass::NamedClass(glyph_class_name) => {
                 GlyphContainer::GlyphClassName(SmolStr::new(glyph_class_name.text()))
             }
-            GlyphOrClass::Null(null) => todo!(),
+            GlyphOrClass::Null(_) => GlyphContainer::GlyphName(GlyphName::new("NULL")),
         }
     }
 }

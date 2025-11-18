@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, Tag};
 
-use crate::{Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, from_anchor};
+use crate::{from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass};
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,7 +168,7 @@ impl GlyphClassDefinition {
 }
 impl AsFea for GlyphClassDefinition {
     fn as_fea(&self, _indent: &str) -> String {
-        format!("{} = {};", self.name, self.glyphs.as_fea(""))
+        format!("@{} = {};", self.name, self.glyphs.as_fea(""))
     }
 }
 impl From<fea_rs::typed::GlyphClassDef> for GlyphClassDefinition {
@@ -193,19 +193,40 @@ impl From<fea_rs::typed::GlyphClassDef> for GlyphClassDefinition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageStatement {
     pub tag: String,
+    pub include_dflt: bool,
+    pub required: bool,
 }
 impl LanguageStatement {
-    pub fn new(tag: String) -> Self {
-        Self { tag }
+    pub fn new(tag: String, include_dflt: bool, required: bool) -> Self {
+        Self {
+            tag,
+            include_dflt,
+            required,
+        }
     }
 }
 impl AsFea for LanguageStatement {
     fn as_fea(&self, _indent: &str) -> String {
-        format!("language {};", self.tag)
+        format!(
+            "language {}{}{};",
+            self.tag,
+            if !self.include_dflt {
+                " exclude_dflt"
+            } else {
+                ""
+            },
+            if self.required { " required" } else { "" },
+        )
     }
 }
 impl From<fea_rs::typed::Language> for LanguageStatement {
     fn from(language: fea_rs::typed::Language) -> Self {
+        let exclude_dflt = language
+            .iter()
+            .any(|t| t.kind() == fea_rs::Kind::ExcludeDfltKw);
+        let required = language
+            .iter()
+            .any(|t| t.kind() == fea_rs::Kind::RequiredKw);
         Self::new(
             language
                 .iter()
@@ -213,6 +234,8 @@ impl From<fea_rs::typed::Language> for LanguageStatement {
                 .unwrap()
                 .text()
                 .to_string(),
+            !exclude_dflt,
+            required,
         )
     }
 }
@@ -322,20 +345,126 @@ impl AsFea for SubtableStatement {
     }
 }
 
+/// A ``parameters`` statement for the `size` feature.
+///
+/// Example: `parameters 10.0 0;` or `parameters 10.0 0 80 120;`
+///
+/// Note: `range_start` and `range_end` are stored in **points** internally,
+/// but the FEA format uses **decipoints** (tenths of a point). The conversion
+/// is handled automatically during parsing and serialization.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SizeParameters {
+    /// Design size in points
+    pub design_size: f64,
+    /// Subfamily identifier
+    pub subfamily_id: u16,
+    /// Range start in points (FEA format stores as decipoints, divided by 10 on read)
+    pub range_start: f64,
+    /// Range end in points (FEA format stores as decipoints, divided by 10 on read)
+    pub range_end: f64,
+    pub location: Range<usize>,
+}
+impl Eq for SizeParameters {}
+
+impl SizeParameters {
+    pub fn new(
+        design_size: f64,
+        subfamily_id: u16,
+        range_start: f64,
+        range_end: f64,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            design_size,
+            subfamily_id,
+            range_start,
+            range_end,
+            location,
+        }
+    }
+}
+
+impl AsFea for SizeParameters {
+    fn as_fea(&self, _indent: &str) -> String {
+        let mut res = format!("parameters {:.1} {}", self.design_size, self.subfamily_id);
+        if self.range_start != 0.0 || self.range_end != 0.0 {
+            res.push_str(&format!(
+                " {} {}",
+                (self.range_start * 10.0) as i32,
+                (self.range_end * 10.0) as i32
+            ));
+        }
+        res.push(';');
+        res
+    }
+}
+
+impl From<fea_rs::typed::Parameters> for SizeParameters {
+    fn from(val: fea_rs::typed::Parameters) -> Self {
+        // Helper to parse FloatLike into f64
+        let parse_float = |fl: fea_rs::typed::FloatLike| -> f64 {
+            match fl {
+                fea_rs::typed::FloatLike::Float(f) => f.text().parse().unwrap(),
+                fea_rs::typed::FloatLike::Number(n) => n.text().parse::<i16>().unwrap() as f64,
+            }
+        };
+
+        // Extract design_size (first FloatLike)
+        let design_size = val
+            .iter()
+            .find_map(fea_rs::typed::FloatLike::cast)
+            .map(parse_float)
+            .unwrap();
+
+        // Extract subfamily_id (second number, after the first FloatLike)
+        let subfamily_id = val
+            .iter()
+            .filter(|t| t.kind() == fea_rs::Kind::Number || t.kind() == fea_rs::Kind::Float)
+            .nth(1)
+            .and_then(fea_rs::typed::Number::cast)
+            .map(|n| n.text().parse().unwrap())
+            .unwrap();
+
+        // Extract range_start (third FloatLike, if present) - FEA stores in decipoints, convert to points
+        let range_start = val
+            .iter()
+            .filter_map(fea_rs::typed::FloatLike::cast)
+            .nth(2)
+            .map(|fl| parse_float(fl) / 10.0)
+            .unwrap_or(0.0);
+
+        // Extract range_end (fourth FloatLike, if present) - FEA stores in decipoints, convert to points
+        let range_end = val
+            .iter()
+            .filter_map(fea_rs::typed::FloatLike::cast)
+            .nth(3)
+            .map(|fl| parse_float(fl) / 10.0)
+            .unwrap_or(0.0);
+
+        Self::new(
+            design_size,
+            subfamily_id,
+            range_start,
+            range_end,
+            val.range(),
+        )
+    }
+}
+
 /// A ``lookupflag`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupFlagStatement {
     pub value: u16,
-    pub mark_attachment: Option<GlyphClass>,
-    pub mark_filtering_set: Option<GlyphClass>,
+    pub mark_attachment: Option<GlyphContainer>,
+    pub mark_filtering_set: Option<GlyphContainer>,
     pub location: Range<usize>,
 }
 
 impl LookupFlagStatement {
     pub fn new(
         value: u16,
-        mark_attachment: Option<GlyphClass>,
-        mark_filtering_set: Option<GlyphClass>,
+        mark_attachment: Option<GlyphContainer>,
+        mark_filtering_set: Option<GlyphContainer>,
         location: Range<usize>,
     ) -> Self {
         Self {
@@ -382,45 +511,30 @@ impl AsFea for LookupFlagStatement {
 impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
     fn from(val: fea_rs::typed::LookupFlag) -> Self {
         let mut value = 0u16;
-        let mut mark_attachment = None;
-        let mut mark_filtering_set = None;
-
-        for item in val.iter() {
-            match item.kind() {
-                fea_rs::Kind::RightToLeftKw => value |= 1,
-                fea_rs::Kind::IgnoreBaseGlyphsKw => value |= 2,
-                fea_rs::Kind::IgnoreLigaturesKw => value |= 4,
-                fea_rs::Kind::IgnoreMarksKw => value |= 8,
-                _ => {}
+        // Check for a numeric value
+        if let Some(number) = val.iter().find_map(fea_rs::typed::Number::cast) {
+            value = number.text().parse().unwrap();
+        } else {
+            for item in val.iter() {
+                match item.kind() {
+                    fea_rs::Kind::RightToLeftKw => value |= 1,
+                    fea_rs::Kind::IgnoreBaseGlyphsKw => value |= 2,
+                    fea_rs::Kind::IgnoreLigaturesKw => value |= 4,
+                    fea_rs::Kind::IgnoreMarksKw => value |= 8,
+                    _ => {}
+                }
             }
         }
 
         // Collect all items and process MarkAttachment and UseMarkFilteringSet
-        let items: Vec<_> = val.iter().collect();
-
-        let mut i = 0;
-        while i < items.len() {
-            match items[i].kind() {
-                fea_rs::Kind::MarkAttachmentTypeKw => {
-                    if i + 1 < items.len()
-                        && let Some(gc) = fea_rs::typed::GlyphClass::cast(items[i + 1])
-                    {
-                        mark_attachment = Some(gc.into());
-                        i += 1; // Skip the glyph class
-                    }
-                }
-                fea_rs::Kind::UseMarkFilteringSetKw => {
-                    if i + 1 < items.len()
-                        && let Some(gc) = fea_rs::typed::GlyphClass::cast(items[i + 1])
-                    {
-                        mark_filtering_set = Some(gc.into());
-                        i += 1; // Skip the glyph class
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
+        let mark_attachment = val
+            .iter()
+            .skip_while(|k| k.kind() != fea_rs::Kind::MarkAttachmentTypeKw)
+            .find_map(|gc| fea_rs::typed::GlyphClass::cast(gc).map(|g| g.into()));
+        let mark_filtering_set = val
+            .iter()
+            .skip_while(|k| k.kind() != fea_rs::Kind::UseMarkFilteringSetKw)
+            .find_map(|gc| fea_rs::typed::GlyphClass::cast(gc).map(|g| g.into()));
 
         LookupFlagStatement::new(value, mark_attachment, mark_filtering_set, val.range())
     }
@@ -448,10 +562,10 @@ impl MarkClassDefinition {
 impl AsFea for MarkClassDefinition {
     fn as_fea(&self, _indent: &str) -> String {
         format!(
-            "markClass @{} {} {};",
-            self.mark_class.name,
+            "markClass {} {} @{};",
+            self.glyphs.as_fea(""),
             self.anchor.as_fea(""),
-            self.glyphs.as_fea("")
+            self.mark_class.name,
         )
     }
 }
@@ -553,13 +667,13 @@ mod tests {
     fn test_generate_lookupflag_with_mark_attachment() {
         let stmt = LookupFlagStatement::new(
             0,
-            Some(GlyphClass::new(
+            Some(GlyphContainer::GlyphClass(GlyphClass::new(
                 vec![
                     GlyphContainer::GlyphName(GlyphName::new("acute")),
                     GlyphContainer::GlyphName(GlyphName::new("grave")),
                 ],
                 0..0,
-            )),
+            ))),
             None,
             0..0,
         );
@@ -678,7 +792,7 @@ mod tests {
         let stmt = GlyphClassDefinition::from(glyph_class_def);
         assert_eq!(stmt.name, "UPPERCASE");
         assert_eq!(stmt.glyphs.glyphs.len(), 6);
-        assert_eq!(stmt.as_fea(""), "UPPERCASE = [A B C D E F];");
+        assert_eq!(stmt.as_fea(""), "@UPPERCASE = [A B C D E F];");
     }
 
     #[test]
@@ -692,7 +806,7 @@ mod tests {
             0..0,
         );
         let stmt = GlyphClassDefinition::new("lowercase".to_string(), glyphs, 0..0);
-        assert_eq!(stmt.as_fea(""), "lowercase = [a b c];");
+        assert_eq!(stmt.as_fea(""), "@lowercase = [a b c];");
     }
 
     // LanguageStatement tests
@@ -717,7 +831,7 @@ mod tests {
 
     #[test]
     fn test_generation_language() {
-        let stmt = LanguageStatement::new("DEU ".to_string());
+        let stmt = LanguageStatement::new("DEU ".to_string(), true, false);
         assert_eq!(stmt.as_fea(""), "language DEU ;");
     }
 
@@ -800,5 +914,138 @@ mod tests {
     fn test_generation_lookupreference() {
         let stmt = LookupReferenceStatement::new("anotherLookup".to_string(), 0..0);
         assert_eq!(stmt.as_fea(""), "lookup anotherLookup;");
+    }
+
+    // SizeParameters tests
+    #[test]
+    fn test_roundtrip_sizeparameters_simple() {
+        const FEA: &str = "feature size { parameters 10.0 0; } size;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let feature = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::Feature::cast)
+            .unwrap();
+        let params = feature
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::Parameters::cast)
+            .unwrap();
+        let stmt = SizeParameters::from(params);
+        assert_eq!(stmt.design_size, 10.0);
+        assert_eq!(stmt.subfamily_id, 0);
+        assert_eq!(stmt.range_start, 0.0);
+        assert_eq!(stmt.range_end, 0.0);
+        assert_eq!(stmt.as_fea(""), "parameters 10.0 0;");
+    }
+
+    #[test]
+    fn test_roundtrip_sizeparameters_with_range() {
+        const FEA: &str = "feature size { parameters 10.0 0 80 120; } size;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let feature = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::Feature::cast)
+            .unwrap();
+        let params = feature
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::Parameters::cast)
+            .unwrap();
+        let stmt = SizeParameters::from(params);
+        assert_eq!(stmt.design_size, 10.0);
+        assert_eq!(stmt.subfamily_id, 0);
+        assert_eq!(stmt.range_start, 8.0); // 80 decipoints = 8.0 points
+        assert_eq!(stmt.range_end, 12.0); // 120 decipoints = 12.0 points
+        assert_eq!(stmt.as_fea(""), "parameters 10.0 0 80 120;");
+    }
+
+    #[test]
+    fn test_generate_sizeparameters() {
+        let stmt = SizeParameters::new(12.5, 1, 100.0, 150.0, 0..0);
+        assert_eq!(stmt.as_fea(""), "parameters 12.5 1 1000 1500;");
+    }
+
+    #[test]
+    fn test_generation_lookupflag() {
+        let stmt = LookupFlagStatement::new(
+            0,
+            Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                vec![
+                    GlyphContainer::GlyphName(GlyphName::new("acute")),
+                    GlyphContainer::GlyphName(GlyphName::new("grave")),
+                ],
+                0..0,
+            ))),
+            None,
+            0..0,
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "lookupflag MarkAttachmentType [acute grave];"
+        );
+        let stmt = LookupFlagStatement::new(
+            9,
+            None,
+            Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                vec![
+                    GlyphContainer::GlyphName(GlyphName::new("acute")),
+                    GlyphContainer::GlyphName(GlyphName::new("grave")),
+                ],
+                0..0,
+            ))),
+            0..0,
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "lookupflag RightToLeft IgnoreMarks UseMarkFilteringSet [acute grave];"
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_lookupflag() {
+        const FEA: &str = "lookup test { lookupflag RightToLeft IgnoreMarks UseMarkFilteringSet [acute grave]; } test;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let lookup = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::LookupBlock::cast)
+            .unwrap();
+        let lookupflag = lookup
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::LookupFlag::cast)
+            .unwrap();
+        let stmt = LookupFlagStatement::from(lookupflag);
+        assert_eq!(stmt.value, 9); // 1 + 8
+        assert_eq!(
+            stmt.clone().mark_filtering_set.unwrap().as_fea(""),
+            "[acute grave]"
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "lookupflag RightToLeft IgnoreMarks UseMarkFilteringSet [acute grave];"
+        );
+
+        const FEA2: &str =
+            "lookup test { lookupflag RightToLeft IgnoreMarks MarkAttachmentType @foo; } test;";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA2);
+        let lookup = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::LookupBlock::cast)
+            .unwrap();
+        let lookupflag = lookup
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::LookupFlag::cast)
+            .unwrap();
+        let stmt = LookupFlagStatement::from(lookupflag);
+        assert_eq!(stmt.value, 9);
+        assert_eq!(
+            stmt.as_fea(""),
+            "lookupflag RightToLeft IgnoreMarks MarkAttachmentType @foo;"
+        );
     }
 }

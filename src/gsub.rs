@@ -352,6 +352,7 @@ impl AsFea for LigatureSubstStatement {
                     .join(" "),
             );
             if !self.suffix.is_empty() {
+                res.push(' ');
                 let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
                 res.push_str(&suffix_str.join(" ").to_string());
             }

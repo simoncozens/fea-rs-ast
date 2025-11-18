@@ -7,3 +7,6 @@ description = "fontTools-like AST wrapper around fea-rs parser"
 [dependencies]
 fea-rs = { version = "0.21.0" }
 smol_str = "0.3.4"
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+rstest = "0.26.1"

@@ -2,7 +2,7 @@ use std::{fmt::Display, ops::Range};
 
 use fea_rs::{
     Kind,
-    typed::{AstNode as _, GlyphOrClass, GsubIgnore},
+    typed::{AstNode as _, GlyphOrClass, GposIgnore, GsubIgnore},
 };
 use smol_str::SmolStr;
 
@@ -155,45 +155,15 @@ impl From<fea_rs::typed::Gsub6> for Statement {
             .filter(|c| c.kind() == Kind::ContextGlyphNode)
             .collect::<Vec<_>>(); // Safe?
 
-        // Do we see any LookupRefNode children within the context glyph nodes?
-        if context_glyph_nodes.iter().any(|cgn| {
-            cgn.as_node()
-                .unwrap()
-                .iter_children()
-                .any(|child| child.kind() == Kind::LookupRefNode)
-        }) {
-            // Within context_glyph_node we want to see a sequence of GlyphOrClass nodes,
-            // each of which may have zero or more LookupRefNode children.
-            let mut context_glyphs = Vec::new();
-            let mut lookups = Vec::new();
-            for context_glyph_node in context_glyph_nodes.iter() {
-                let glyph_node = context_glyph_node.as_node().unwrap();
-                for node in glyph_node.iter_children() {
-                    if let Some(goc) = GlyphOrClass::cast(node) {
-                        context_glyphs.push(goc.into());
-                        lookups.push(vec![]);
-                    } else if let Some(lookup_ref) = fea_rs::typed::LookupRef::cast(node)
-                        && let Some(last) = lookups.last_mut()
-                    {
-                        last.push(SmolStr::new(
-                            &lookup_ref
-                                .node()
-                                .iter_tokens()
-                                .find(|t| t.kind == Kind::Ident)
-                                .unwrap()
-                                .text,
-                        ));
-                    }
-                }
-            }
-            return Statement::ChainedContextSubst(ChainedContextStatement {
+        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(context_glyph_nodes) {
+            return Statement::ChainedContextSubst(ChainedContextStatement::new(
+                context_glyphs,
                 prefix,
                 suffix,
-                glyphs: context_glyphs,
                 lookups,
-                location: val.node().range(),
-                sub_or_pos: Subst,
-            });
+                val.node().range(),
+                Subst,
+            ));
         }
         // I'm assuming there's an InlineSubNode here, let's find it.
         let Some(inline_sub) = val
@@ -219,7 +189,7 @@ impl From<fea_rs::typed::Gsub6> for Statement {
                 glyph: context_glyphs.remove(0),
                 replacement: target_glyphs,
                 location: val.node().range(),
-                force_chain: false,
+                force_chain: true,
             });
         }
         if context_glyphs.len() == 1 && target_glyphs.len() == 1 {
@@ -229,7 +199,7 @@ impl From<fea_rs::typed::Gsub6> for Statement {
                 glyphs: context_glyphs,
                 replacement: target_glyphs,
                 location: val.node().range(),
-                force_chain: false,
+                force_chain: true,
             });
         }
         if context_glyphs.len() > 1 && target_glyphs.len() == 1 {
@@ -240,10 +210,76 @@ impl From<fea_rs::typed::Gsub6> for Statement {
                 glyphs: context_glyphs,
                 replacement: target_glyphs[0].clone(),
                 location: val.node().range(),
-                force_chain: false,
+                force_chain: true,
             });
         }
         panic!("Don't know what this GSUB6 is supposed to be!")
+    }
+}
+
+fn check_for_simple_contextual(
+    context_glyph_nodes: Vec<&fea_rs::NodeOrToken>,
+) -> Option<(Vec<GlyphContainer>, Vec<Vec<SmolStr>>)> {
+    // Do we see any LookupRefNode children within the context glyph nodes?
+    if context_glyph_nodes.iter().any(|cgn| {
+        cgn.as_node()
+            .unwrap()
+            .iter_children()
+            .any(|child| child.kind() == Kind::LookupRefNode)
+    }) {
+        // Within context_glyph_node we want to see a sequence of GlyphOrClass nodes,
+        // each of which may have zero or more LookupRefNode children.
+        let mut context_glyphs = Vec::new();
+        let mut lookups = Vec::new();
+        for context_glyph_node in context_glyph_nodes.iter() {
+            let glyph_node = context_glyph_node.as_node().unwrap();
+            for node in glyph_node.iter_children() {
+                if let Some(goc) = GlyphOrClass::cast(node) {
+                    context_glyphs.push(goc.into());
+                    lookups.push(vec![]);
+                } else if let Some(lookup_ref) = fea_rs::typed::LookupRef::cast(node)
+                    && let Some(last) = lookups.last_mut()
+                {
+                    last.push(SmolStr::new(
+                        &lookup_ref
+                            .node()
+                            .iter_tokens()
+                            .find(|t| t.kind == Kind::Ident)
+                            .unwrap()
+                            .text,
+                    ));
+                }
+            }
+        }
+        return Some((context_glyphs, lookups));
+    }
+    None
+}
+
+impl From<fea_rs::typed::Gpos8> for Statement {
+    fn from(val: fea_rs::typed::Gpos8) -> Self {
+        let prefix = backtrack(val.node());
+        let suffix = lookahead(val.node());
+        let context_glyph_nodes = fea_rs::Node::iter_children(val.node())
+            .find(|c| c.kind() == Kind::ContextSequence)
+            .unwrap()
+            .as_node()
+            .unwrap()
+            .iter_children()
+            .filter(|c| c.kind() == Kind::ContextGlyphNode)
+            .collect::<Vec<_>>(); // Safe?
+        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(context_glyph_nodes) {
+            return Statement::ChainedContextPos(ChainedContextStatement::new(
+                context_glyphs,
+                prefix,
+                suffix,
+                lookups,
+                val.node().range(),
+                Pos,
+            ));
+        }
+        // Some kind of inline thing, but fea-rs doesn't completely implement this yet
+        panic!("Don't know how to handle GPOS8 with inline substitutions yet")
     }
 }
 
@@ -345,6 +381,25 @@ impl From<GsubIgnore> for IgnoreStatement<Subst> {
     }
 }
 
+
+impl From<GposIgnore> for IgnoreStatement<Pos> {
+    fn from(val: GposIgnore) -> Self {
+        let mut chain_contexts = Vec::new();
+        for context in val.node().iter_children() {
+            if let Some(chain_context) = fea_rs::typed::IgnoreRule::cast(context) {
+                let prefix = backtrack(chain_context.node());
+                let suffix = lookahead(chain_context.node());
+                let glyphs = context_glyphs(chain_context.node());
+                chain_contexts.push((prefix, glyphs, suffix));
+            }
+        }
+        IgnoreStatement {
+            chain_contexts,
+            location: val.node().range(),
+            sub_or_pos: Pos,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::{GlyphClass, GlyphName};

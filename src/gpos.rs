@@ -1,11 +1,11 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
-use crate::{Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord, from_anchor};
+use crate::{from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
@@ -115,15 +115,27 @@ impl PairPosStatement {
 impl AsFea for PairPosStatement {
     fn as_fea(&self, indent: &str) -> String {
         let mut res = String::new();
+        if self.enumerated {
+            res.push_str("enum ");
+        }
         res.push_str("pos ");
-        res.push_str(&format!(
-            "{} {} ",
-            self.glyphs_1.as_fea(""),
-            self.glyphs_2.as_fea("")
-        ));
-        res.push_str(&self.value_record_1.as_fea(indent).to_string());
         if let Some(vr2) = &self.value_record_2 {
-            res.push_str(&format!(" {}", vr2.as_fea(indent)));
+            // glyphs1 valuerecord1 glyphs2 valuerecord2
+            res.push_str(&format!(
+                "{} {} {} {}",
+                self.glyphs_1.as_fea(""),
+                self.value_record_1.as_fea(indent),
+                self.glyphs_2.as_fea(""),
+                vr2.as_fea(indent)
+            ));
+        } else {
+            // glyphs1 glyphs2 valuerecord1
+            res.push_str(&format!(
+                "{} {} {}",
+                self.glyphs_1.as_fea(""),
+                self.glyphs_2.as_fea(""),
+                self.value_record_1.as_fea(indent),
+            ));
         }
         res.push(';');
         res
@@ -132,6 +144,7 @@ impl AsFea for PairPosStatement {
 
 impl From<fea_rs::typed::Gpos2> for PairPosStatement {
     fn from(val: fea_rs::typed::Gpos2) -> Self {
+        let enumerated = val.iter().any(|t| t.kind() == Kind::EnumKw);
         let glyphs_1 = val.iter().find_map(GlyphOrClass::cast).unwrap().into();
         let glyphs_2 = val
             .iter()
@@ -148,10 +161,6 @@ impl From<fea_rs::typed::Gpos2> for PairPosStatement {
             .filter_map(fea_rs::typed::ValueRecord::cast)
             .nth(1)
             .map(|vr| vr.into());
-        let enumerated = val
-            .iter()
-            .take_while(|t| t.kind() != Kind::PosKw)
-            .any(|t| t.kind() == Kind::EnumKw);
         Self::new(
             glyphs_1,
             glyphs_2,
@@ -231,19 +240,6 @@ pub struct MarkBasePosStatement {
     pub location: Range<usize>,
 }
 
-/// A mark-to-ligature positioning rule (GPOS type 5)
-///
-/// The `marks` field is a list of lists: each element represents a component glyph,
-/// and is made up of a list of (Anchor, MarkClass) tuples for that component.
-///
-/// Example: `pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS;`
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MarkLigPosStatement {
-    pub ligatures: GlyphContainer,
-    pub marks: Vec<Vec<(Anchor, MarkClass)>>,
-    pub location: Range<usize>,
-}
-
 impl MarkBasePosStatement {
     pub fn new(
         base: GlyphContainer,
@@ -311,6 +307,19 @@ impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
 
         MarkBasePosStatement::new(base, marks, val.range())
     }
+}
+
+/// A mark-to-ligature positioning rule (GPOS type 5)
+///
+/// The `marks` field is a list of lists: each element represents a component glyph,
+/// and is made up of a list of (Anchor, MarkClass) tuples for that component.
+///
+/// Example: `pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkLigPosStatement {
+    pub ligatures: GlyphContainer,
+    pub marks: Vec<Vec<(Anchor, MarkClass)>>,
+    pub location: Range<usize>,
 }
 
 impl MarkLigPosStatement {
@@ -401,6 +410,82 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
             .collect();
 
         MarkLigPosStatement::new(ligatures, marks, val.range())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkMarkPosStatement {
+    base_marks: GlyphContainer,
+    marks: Vec<(Anchor, MarkClass)>,
+    location: Range<usize>,
+}
+
+impl MarkMarkPosStatement {
+    pub fn new(
+        base_marks: GlyphContainer,
+        marks: Vec<(Anchor, MarkClass)>,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            base_marks,
+            marks,
+            location,
+        }
+    }
+}
+
+impl AsFea for MarkMarkPosStatement {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = format!("pos mark {}", self.base_marks.as_fea(""));
+        for (anchor, mark_class) in &self.marks {
+            res.push_str(&format!(
+                "\n{}    {} mark @{}",
+                indent,
+                anchor.as_fea(""),
+                mark_class.name
+            ));
+        }
+        res.push(';');
+        res
+    }
+}
+
+impl From<fea_rs::typed::Gpos6> for MarkMarkPosStatement {
+    fn from(val: fea_rs::typed::Gpos6) -> Self {
+        // Extract base mark glyph (it's after "pos" keyword and "mark" keyword)
+        let base_marks: GlyphContainer = val
+            .iter()
+            .filter(|t| t.kind() != Kind::Whitespace)
+            .nth(2) // Skip "pos" and "mark" keywords
+            .and_then(GlyphOrClass::cast)
+            .unwrap()
+            .into();
+
+        // Extract all AnchorMark nodes (after the base mark glyph)
+        let marks: Vec<(Anchor, MarkClass)> = val
+            .iter()
+            .filter_map(fea_rs::typed::AnchorMark::cast)
+            .map(|anchor_mark| {
+                // Get the anchor from the AnchorMark node
+                let anchor_node = anchor_mark
+                    .iter()
+                    .find_map(fea_rs::typed::Anchor::cast)
+                    .unwrap();
+                let anchor = from_anchor(anchor_node).unwrap();
+
+                // Get the mark class name (it's a @GlyphClass token)
+                let mark_class_node = anchor_mark
+                    .iter()
+                    .find_map(fea_rs::typed::GlyphClassName::cast)
+                    .unwrap();
+                let mark_class_name = mark_class_node.text().trim_start_matches('@');
+                let mark_class = MarkClass::new(mark_class_name);
+
+                (anchor, mark_class)
+            })
+            .collect();
+
+        MarkMarkPosStatement::new(base_marks, marks, val.node().range())
     }
 }
 
