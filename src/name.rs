@@ -4,6 +4,14 @@ use fea_rs::typed::AstNode;
 
 use crate::AsFea;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NameRecordKind {
+    Name(u16),
+    FeatureName,
+    FeatureSizeMenuName,
+    StatName,
+}
+
 /// A name record statement in a name table.
 ///
 /// Example: `nameid 9 "Joachim M\00fcller-Lanc\00e9";`
@@ -11,8 +19,6 @@ use crate::AsFea;
 /// The string field contains the raw string with escape sequences already processed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameRecord {
-    /// Name ID (e.g., 9 for designer's name)
-    pub name_id: u16,
     /// Platform ID
     pub platform_id: u16,
     /// Platform encoding ID
@@ -21,24 +27,27 @@ pub struct NameRecord {
     pub lang_id: u16,
     /// The name string (with escape sequences processed)
     pub string: String,
+    /// Kind of the name record
+    pub kind: NameRecordKind,
+    /// Location in the source FEA file
     pub location: Range<usize>,
 }
 
 impl NameRecord {
     pub fn new(
-        name_id: u16,
         platform_id: u16,
         plat_enc_id: u16,
         lang_id: u16,
         string: String,
+        kind: NameRecordKind,
         location: Range<usize>,
     ) -> Self {
         Self {
-            name_id,
             platform_id,
             plat_enc_id,
             lang_id,
             string,
+            kind,
             location,
         }
     }
@@ -56,8 +65,17 @@ impl AsFea for NameRecord {
         } else {
             &format!("{} {} {}", self.platform_id, self.plat_enc_id, self.lang_id)
         };
+        match self.kind {
+            NameRecordKind::Name(id) => format!("nameid {} {}\"{}\";", id, plat, escaped),
 
-        format!("nameid {} {}\"{}\";", self.name_id, plat, escaped)
+            NameRecordKind::FeatureName => {
+                format!("name {}\"{}\";", plat, escaped)
+            }
+            NameRecordKind::FeatureSizeMenuName => {
+                format!("sizemenuname {}\"{}\";", plat, escaped)
+            }
+            NameRecordKind::StatName => format!("name {}\"{}\";", plat, escaped),
+        }
     }
 }
 
@@ -70,41 +88,46 @@ impl From<fea_rs::typed::NameRecord> for NameRecord {
         // Get the NameSpec which contains platform info and string
         let name_spec = val.iter().find_map(fea_rs::typed::NameSpec::cast).unwrap();
 
-        // Parse platform/encoding/language IDs if present
-        // They appear as three consecutive DecOctHex values after the name_id
-        let platform_ids: Vec<u16> = name_spec
-            .iter()
-            .filter_map(fea_rs::typed::DecOctHex::cast)
-            .map(|n| parse_dec_oct_hex(&n))
-            .collect();
-        let (platform_id, plat_enc_id, lang_id) = if platform_ids.len() == 3 {
-            (platform_ids[0], platform_ids[1], platform_ids[2])
-        } else if platform_ids.is_empty() || platform_ids[0] == 3 {
-            (3, 1, 0x409)
-        } else {
-            (1, 0, 0)
-        };
-        // Get the string (with escape sequences that need to be unescaped)
-        let string = name_spec
-            .iter()
-            .find(|t| t.kind() == fea_rs::Kind::String)
-            .and_then(|t| t.as_token())
-            .map(|tok| {
-                let s = tok.text.as_str();
-                // Remove surrounding quotes and unescape
-                unescape_string(&s[1..s.len() - 1])
-            })
-            .unwrap();
+        let (platform_id, plat_enc_id, lang_id, string) = parse_namespec(name_spec);
 
         Self::new(
-            name_id,
             platform_id,
             plat_enc_id,
             lang_id,
             string,
+            NameRecordKind::Name(name_id),
             val.range(),
         )
     }
+}
+
+pub(crate) fn parse_namespec(name_spec: fea_rs::typed::NameSpec) -> (u16, u16, u16, String) {
+    // Parse platform/encoding/language IDs if present
+    // They appear as three consecutive DecOctHex values after the name_id
+    let platform_ids: Vec<u16> = name_spec
+        .iter()
+        .filter_map(fea_rs::typed::DecOctHex::cast)
+        .map(|n| parse_dec_oct_hex(&n))
+        .collect();
+    let (platform_id, plat_enc_id, lang_id) = if platform_ids.len() == 3 {
+        (platform_ids[0], platform_ids[1], platform_ids[2])
+    } else if platform_ids.is_empty() || platform_ids[0] == 3 {
+        (3, 1, 0x409)
+    } else {
+        (1, 0, 0)
+    };
+    // Get the string (with escape sequences that need to be unescaped)
+    let string = name_spec
+        .iter()
+        .find(|t| t.kind() == fea_rs::Kind::String)
+        .and_then(|t| t.as_token())
+        .map(|tok| {
+            let s = tok.text.as_str();
+            // Remove surrounding quotes and unescape
+            unescape_string(&s[1..s.len() - 1])
+        })
+        .unwrap();
+    (platform_id, plat_enc_id, lang_id, string)
 }
 
 /// Parse a DecOctHex value into u16
@@ -199,7 +222,7 @@ mod tests {
             .find_map(fea_rs::typed::NameRecord::cast)
             .unwrap();
         let stmt = NameRecord::from(name_rec);
-        assert_eq!(stmt.name_id, 9);
+        assert_eq!(stmt.kind, NameRecordKind::Name(9));
         assert_eq!(stmt.platform_id, 3);
         assert_eq!(stmt.string, "John Smith");
         assert_eq!(stmt.as_fea(""), r#"nameid 9 "John Smith";"#);
@@ -220,7 +243,7 @@ mod tests {
             .find_map(fea_rs::typed::NameRecord::cast)
             .unwrap();
         let stmt = NameRecord::from(name_rec);
-        assert_eq!(stmt.name_id, 1);
+        assert_eq!(stmt.kind, NameRecordKind::Name(1));
         assert_eq!(stmt.platform_id, 3);
         assert_eq!(stmt.plat_enc_id, 1);
         assert_eq!(stmt.lang_id, 0x409);
@@ -243,7 +266,7 @@ mod tests {
             .find_map(fea_rs::typed::NameRecord::cast)
             .unwrap();
         let stmt = NameRecord::from(name_rec);
-        assert_eq!(stmt.name_id, 9);
+        assert_eq!(stmt.kind, NameRecordKind::Name(9));
         // Parser unescapes the string, so we get actual Unicode characters
         assert_eq!(stmt.string, "Joachim Müller-Lancé");
         // When we serialize, we re-escape non-ASCII characters
@@ -255,7 +278,14 @@ mod tests {
 
     #[test]
     fn test_generate_namerecord() {
-        let stmt = NameRecord::new(9, 3, 1, 0x409, "Test Designer".to_string(), 0..0);
+        let stmt = NameRecord::new(
+            3,
+            1,
+            0x409,
+            "Test Designer".to_string(),
+            NameRecordKind::Name(9),
+            0..0,
+        );
         assert_eq!(stmt.as_fea(""), r#"nameid 9 "Test Designer";"#);
     }
 

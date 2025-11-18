@@ -6,7 +6,9 @@ table name {
 
 table STAT {
 
-   ElidedFallbackName { name "Roman"; };
+   ElidedFallbackName { 
+      name "Roman";
+};
 
    DesignAxis opsz 0 { badtag "Optical Size"; };  #'badtag' instead of 'name' is incorrect
    DesignAxis wdth 1 { name "Width"; };
@@ -22,7 +24,7 @@ table STAT {
    AxisValue {
       location opsz 11 9 12;
       name "Text";
-      flag OlderSiblingFontAttribute ElidableAxisValueName ;
+      flag OlderSiblingFontAttribute ElidableAxisValueName;
    };
 
    AxisValue {

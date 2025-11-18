@@ -155,7 +155,7 @@ impl From<fea_rs::typed::Gsub6> for Statement {
             .filter(|c| c.kind() == Kind::ContextGlyphNode)
             .collect::<Vec<_>>(); // Safe?
 
-        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(context_glyph_nodes) {
+        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(&context_glyph_nodes) {
             return Statement::ChainedContextSubst(ChainedContextStatement::new(
                 context_glyphs,
                 prefix,
@@ -173,7 +173,11 @@ impl From<fea_rs::typed::Gsub6> for Statement {
         else {
             panic!(
                 "No LookRefNode or InlineSubNode found in Gsub6, can't get here, fea-rs has failed me: {}",
-                val.node().iter_tokens().map(|t| t.text.clone()).collect::<Vec<_>>().join("")
+                val.node()
+                    .iter_tokens()
+                    .map(|t| t.text.clone())
+                    .collect::<Vec<_>>()
+                    .join("")
             );
         };
         let target_glyphs = inline_sub
@@ -219,7 +223,7 @@ impl From<fea_rs::typed::Gsub6> for Statement {
 }
 
 fn check_for_simple_contextual(
-    context_glyph_nodes: Vec<&fea_rs::NodeOrToken>,
+    context_glyph_nodes: &[&fea_rs::NodeOrToken],
 ) -> Option<(Vec<GlyphContainer>, Vec<Vec<SmolStr>>)> {
     // Do we see any LookupRefNode children within the context glyph nodes?
     if context_glyph_nodes.iter().any(|cgn| {
@@ -269,7 +273,7 @@ impl From<fea_rs::typed::Gpos8> for Statement {
             .iter_children()
             .filter(|c| c.kind() == Kind::ContextGlyphNode)
             .collect::<Vec<_>>(); // Safe?
-        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(context_glyph_nodes) {
+        if let Some((context_glyphs, lookups)) = check_for_simple_contextual(&context_glyph_nodes) {
             return Statement::ChainedContextPos(ChainedContextStatement::new(
                 context_glyphs,
                 prefix,
@@ -279,8 +283,29 @@ impl From<fea_rs::typed::Gpos8> for Statement {
                 Pos,
             ));
         }
-        // Some kind of inline thing, but fea-rs doesn't completely implement this yet
-        panic!("Don't know how to handle GPOS8 with inline substitutions yet")
+        // Each ContextGlyphNode should have a single GlyphOrClass child and a ValueRecord child
+        let mut context_glyphs = Vec::new();
+        for context_glyph_node in context_glyph_nodes.iter() {
+            let glyph_node = context_glyph_node.as_node().unwrap();
+            let glyph = glyph_node
+                .iter_children()
+                .find_map(GlyphOrClass::cast);
+            let value_record_node = glyph_node
+                .iter_children()
+                .find_map(fea_rs::typed::ValueRecord::cast);
+            if let (Some(goc), Some(vr)) = (glyph, value_record_node) {
+                context_glyphs.push((goc.into(), vr.into()));
+            }
+        }
+        Statement::SinglePos(
+            crate::gpos::SinglePosStatement::new(
+                prefix,
+                suffix,
+                context_glyphs,
+                true,
+                val.node().range(),
+            )
+        )
     }
 }
 
@@ -400,6 +425,56 @@ impl From<GposIgnore> for IgnoreStatement<Pos> {
         }
     }
 }
+
+// There's a parallelism in a few statement types that might have a
+// prefix or a suffix, and the string joining for the FEA generation
+// is always a bit fiddly.
+// Put it here once and get it right for all.
+pub(crate) trait PotentiallyContextualStatement {
+    fn prefix(&self) -> &[GlyphContainer];
+    fn suffix(&self) -> &[GlyphContainer];
+    fn force_chain(&self) -> bool;
+    fn format_begin(&self, indent: &str) -> String;
+    fn format_contextual_parts(&self, indent: &str) ->Vec<String>;
+    fn format_noncontextual_parts(&self, indent: &str) ->Vec<String>;
+    fn format_end(&self, _indent: &str) -> String {
+        "".to_string()
+    }
+
+    fn is_contextual(&self) -> bool {
+        !self.prefix().is_empty() || !self.suffix().is_empty() || self.force_chain()
+    }
+}
+
+impl<T: PotentiallyContextualStatement> AsFea for T {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = String::new();
+        res.push_str(&self.format_begin(indent));
+        if self.is_contextual() {
+            if !self.prefix().is_empty() {
+                let prefix_str: Vec<String> = self.prefix().iter().map(|g| g.as_fea("")).collect();
+                res.push_str(&prefix_str.join(" ").to_string());
+                res.push(' ');
+            }
+            res.push_str(&self.format_contextual_parts(indent).join(" "));
+            if !self.suffix().is_empty() {
+                let suffix_str: Vec<String> = self.suffix().iter().map(|g| g.as_fea("")).collect();
+                res.push_str(&format!(" {}", suffix_str.join(" ")));
+            }
+        } else {
+            res.push_str(
+                self.format_noncontextual_parts(indent)
+                    .join(" ")
+                    .as_str(),
+            );
+        }
+        res.push_str(&self.format_end(indent));
+        res.push(';');
+        res
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use crate::{GlyphClass, GlyphName};

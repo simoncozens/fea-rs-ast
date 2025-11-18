@@ -1,6 +1,7 @@
-use fea_rs::{NodeOrToken, typed::AstNode};
+use fea_rs::{typed::AstNode, NodeOrToken};
 
 use crate::{
+    stat::{StatDesignAxisStatement, StatStatement},
     AsFea, AttachStatement, Comment, FontRevisionStatement, GlyphClassDefStatement,
     LigatureCaretByIndexStatement, LigatureCaretByPosStatement, NameRecord, SHIFT,
 };
@@ -183,15 +184,27 @@ impl From<fea_rs::typed::NameTable> for Table<Name> {
     }
 }
 
-// TODO: Implement Stat table properly
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stat;
 impl FeaTable for Stat {
-    type Statement = Comment;
+    type Statement = StatStatement;
     const TAG: &'static str = "STAT";
     type FeaRsTable = fea_rs::typed::StatTable;
-    fn to_statement(_child: &NodeOrToken) -> Option<Comment> {
-        None // Placeholder
+    #[allow(clippy::manual_map)]
+    fn to_statement(child: &NodeOrToken) -> Option<StatStatement> {
+        if child.kind() == fea_rs::Kind::Comment {
+            Some(StatStatement::Comment(Comment::from(
+                child.token_text().unwrap(),
+            )))
+        } else if let Some(da) = fea_rs::typed::StatDesignAxis::cast(child) {
+            Some(StatStatement::DesignAxis(da.into()))
+        } else if let Some(efn) = fea_rs::typed::StatElidedFallbackName::cast(child) {
+            Some(StatStatement::from(efn))
+        } else if let Some(efn) = fea_rs::typed::StatAxisValue::cast(child) {
+            Some(StatStatement::AxisValue(efn.into()))
+        } else {
+            None
+        }
     }
 }
 

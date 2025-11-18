@@ -3,7 +3,10 @@ use fea_rs::{
     Kind,
 };
 
-use crate::contextual::{backtrack, context_glyphs, lookahead};
+use crate::{
+    contextual::{backtrack, context_glyphs, lookahead},
+    PotentiallyContextualStatement,
+};
 use crate::{AsFea, GlyphContainer};
 use std::ops::Range;
 
@@ -42,33 +45,35 @@ impl SingleSubstStatement {
         }
     }
 }
-impl AsFea for SingleSubstStatement {
-    fn as_fea(&self, _indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str("sub ");
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || self.force_chain {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
-            }
-            let glyphs_str: Vec<String> = self
-                .glyphs
-                .iter()
-                .map(|g| format!("{}'", g.as_fea("")))
-                .collect();
-            res.push_str(&glyphs_str.join(" "));
-            if !self.suffix.is_empty() {
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&format!(" {}", suffix_str.join(" ")));
-            }
-        } else {
-            let glyphs_str: Vec<String> = self.glyphs.iter().map(|g| g.as_fea("")).collect();
-            res.push_str(&glyphs_str.join(" "));
-        }
+
+impl PotentiallyContextualStatement for SingleSubstStatement {
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        self.force_chain
+    }
+
+    fn format_begin(&self, _indent: &str) -> String {
+        "sub ".to_string()
+    }
+
+    fn format_contextual_parts(&self, _indent: &str) -> Vec<String> {
+        self.glyphs
+            .iter()
+            .map(|g| format!("{}'", g.as_fea("")))
+            .collect()
+    }
+
+    fn format_noncontextual_parts(&self, _indent: &str) -> Vec<String> {
+        self.glyphs.iter().map(|g| g.as_fea("")).collect()
+    }
+    fn format_end(&self, _indent: &str) -> String {
         let replacement_str: Vec<String> = self.replacement.iter().map(|g| g.as_fea("")).collect();
-        res.push_str(&format!(" by {};", replacement_str.join(" ")));
-        res
+        format!(" by {}", replacement_str.join(" "))
     }
 }
 
@@ -126,28 +131,33 @@ impl MultipleSubstStatement {
         }
     }
 }
-impl AsFea for MultipleSubstStatement {
-    fn as_fea(&self, _indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str("sub ");
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || self.force_chain {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
-            }
-            res.push_str(&format!("{}'", self.glyph.as_fea("")));
-            if !self.suffix.is_empty() {
-                res.push(' ');
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&suffix_str.join(" ").to_string());
-            }
-        } else {
-            res.push_str(&self.glyph.as_fea(""));
-        }
+
+impl PotentiallyContextualStatement for MultipleSubstStatement {
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        self.force_chain
+    }
+
+    fn format_begin(&self, _indent: &str) -> String {
+        "sub ".to_string()
+    }
+
+    fn format_contextual_parts(&self, _indent: &str) -> Vec<String> {
+        vec![format!("{}'", self.glyph.as_fea(""))]
+    }
+
+    fn format_noncontextual_parts(&self, _indent: &str) -> Vec<String> {
+        vec![self.glyph.as_fea("")]
+    }
+
+    fn format_end(&self, _indent: &str) -> String {
         let replacement_str: Vec<String> = self.replacement.iter().map(|g| g.as_fea("")).collect();
-        res.push_str(&format!(" by {};", replacement_str.join(" ")));
-        res
+        format!(" by {}", replacement_str.join(" "))
     }
 }
 
@@ -254,27 +264,32 @@ impl AlternateSubstStatement {
         }
     }
 }
-impl AsFea for AlternateSubstStatement {
-    fn as_fea(&self, _indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str("sub ");
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || self.force_chain {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
-            }
-            res.push_str(&format!("{}'", self.glyph.as_fea("")));
-            if !self.suffix.is_empty() {
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&suffix_str.join(" ").to_string());
-            }
-        } else {
-            res.push_str(&self.glyph.as_fea(""));
-        }
+
+impl PotentiallyContextualStatement for AlternateSubstStatement {
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        self.force_chain
+    }
+
+    fn format_begin(&self, _indent: &str) -> String {
+        "sub ".to_string()
+    }
+
+    fn format_contextual_parts(&self, _indent: &str) -> Vec<String> {
+        vec![format!("{}'", self.glyph.as_fea(""))]
+    }
+
+    fn format_noncontextual_parts(&self, _indent: &str) -> Vec<String> {
+        vec![self.glyph.as_fea("")]
+    }
+    fn format_end(&self, _indent: &str) -> String {
         let replacement_str: String = self.replacement.as_fea("");
-        res.push_str(&format!(" from {};", replacement_str));
-        res
+        format!(" from {}", replacement_str)
     }
 }
 
@@ -333,42 +348,35 @@ impl LigatureSubstStatement {
     }
 }
 
-impl AsFea for LigatureSubstStatement {
-    fn as_fea(&self, _indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str("sub ");
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || self.force_chain {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
-            }
-            res.push_str(
-                &self
-                    .glyphs
-                    .iter()
-                    .map(|g| g.as_fea("") + "'")
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            );
-            if !self.suffix.is_empty() {
-                res.push(' ');
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&suffix_str.join(" ").to_string());
-            }
-        } else {
-            res.push_str(
-                &self
-                    .glyphs
-                    .iter()
-                    .map(|g| g.as_fea(""))
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            );
-        }
+impl PotentiallyContextualStatement for LigatureSubstStatement {
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        self.force_chain
+    }
+
+    fn format_begin(&self, _indent: &str) -> String {
+        "sub ".to_string()
+    }
+
+    fn format_contextual_parts(&self, _indent: &str) -> Vec<String> {
+        self.glyphs
+            .iter()
+            .map(|g| format!("{}'", g.as_fea("")))
+            .collect()
+    }
+
+    fn format_noncontextual_parts(&self, _indent: &str) -> Vec<String> {
+        self.glyphs.iter().map(|g| g.as_fea("")).collect()
+    }
+
+    fn format_end(&self, _indent: &str) -> String {
         let replacement_str: String = self.replacement.as_fea("");
-        res.push_str(&format!(" by {};", replacement_str));
-        res
+        format!(" by {}", replacement_str)
     }
 }
 

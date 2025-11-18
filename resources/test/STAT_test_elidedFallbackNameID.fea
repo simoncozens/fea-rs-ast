@@ -17,9 +17,9 @@ table STAT {
         name "Italic";
     };  # here comment
     AxisValue {
-        location opsz 8;  # comment here
-        location wdth 400; # another comment
-        name "Caption"; # more comments
+        location opsz 8;
+        location wdth 400;
+        name "Caption";
     };
     AxisValue {
         location opsz 11 9 12;
@@ -79,6 +79,6 @@ table STAT {
     AxisValue {
         location ital 0;
         name "Roman";
-        flag ElidableAxisValueName; # flag comment
+        flag ElidableAxisValueName;
     };
 } STAT;

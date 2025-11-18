@@ -1,15 +1,18 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
-use crate::{Anchor, AsFea, GlyphContainer, MarkClass, ValueRecord, from_anchor};
+use crate::{
+    from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement,
+    ValueRecord,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
-    pub pos: (GlyphContainer, ValueRecord),
+    pub pos: Vec<(GlyphContainer, ValueRecord)>,
     pub prefix: Vec<GlyphContainer>,
     pub suffix: Vec<GlyphContainer>,
     pub force_chain: bool,
@@ -20,7 +23,7 @@ impl SinglePosStatement {
     pub fn new(
         prefix: Vec<GlyphContainer>,
         suffix: Vec<GlyphContainer>,
-        pos: (GlyphContainer, ValueRecord),
+        pos: Vec<(GlyphContainer, ValueRecord)>,
         force_chain: bool,
         location: Range<usize>,
     ) -> Self {
@@ -34,34 +37,33 @@ impl SinglePosStatement {
     }
 }
 
-impl AsFea for SinglePosStatement {
-    fn as_fea(&self, indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str("pos ");
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || self.force_chain {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
-            }
-            res.push_str(&format!(
-                "{}' {}",
-                self.pos.0.as_fea(""),
-                self.pos.1.as_fea(indent),
-            ));
-            if !self.suffix.is_empty() {
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&format!(" {}", suffix_str.join(" ")));
-            }
-        } else {
-            res.push_str(&format!(
-                "{} {}",
-                self.pos.0.as_fea(""),
-                self.pos.1.as_fea(indent),
-            ));
-        }
-        res.push(';');
-        res
+impl PotentiallyContextualStatement for SinglePosStatement {
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        self.force_chain
+    }
+
+    fn format_begin(&self, _indent: &str) -> String {
+        "pos ".to_string()
+    }
+
+    fn format_contextual_parts(&self, indent: &str) -> Vec<String> {
+        self.pos
+            .iter()
+            .map(|(p, vr)| format!("{}' {}", p.as_fea(""), vr.as_fea(indent)))
+            .collect()
+    }
+
+    fn format_noncontextual_parts(&self, indent: &str) -> Vec<String> {
+        self.pos
+            .iter()
+            .map(|(p, vr)| format!("{} {}", p.as_fea(""), vr.as_fea(indent)))
+            .collect()
     }
 }
 
@@ -75,7 +77,7 @@ impl From<fea_rs::typed::Gpos1> for SinglePosStatement {
         Self::new(
             vec![],
             vec![],
-            (target.into(), value_record.into()),
+            vec![(target.into(), value_record.into())],
             false,
             val.node().range(),
         )
@@ -387,23 +389,22 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
                 lig_component
                     .iter()
                     .filter_map(fea_rs::typed::AnchorMark::cast)
-                    .map(|anchor_mark| {
+                    .flat_map(|anchor_mark| {
                         // Get the anchor from the AnchorMark node
                         let anchor_node = anchor_mark
                             .iter()
                             .find_map(fea_rs::typed::Anchor::cast)
                             .unwrap();
-                        let anchor = from_anchor(anchor_node).unwrap();
+                        let anchor = from_anchor(anchor_node)?;
 
                         // Get the mark class name (it's a @GlyphClass token)
                         let mark_class_node = anchor_mark
                             .iter()
-                            .find_map(fea_rs::typed::GlyphClassName::cast)
-                            .unwrap();
+                            .find_map(fea_rs::typed::GlyphClassName::cast)?;
                         let mark_class_name = mark_class_node.text().trim_start_matches('@');
                         let mark_class = MarkClass::new(mark_class_name);
 
-                        (anchor, mark_class)
+                        Some((anchor, mark_class))
                     })
                     .collect()
             })
@@ -500,7 +501,7 @@ mod tests {
         let gpos1 = SinglePosStatement::new(
             vec![GlyphContainer::GlyphName(GlyphName::new("x"))],
             vec![],
-            (
+            vec![(
                 GlyphContainer::GlyphName(GlyphName::new("A")),
                 ValueRecord {
                     x_advance: Some(50),
@@ -514,7 +515,7 @@ mod tests {
                     vertical: false,
                     location: 0..0,
                 },
-            ),
+            )],
             false,
             0..10,
         );
