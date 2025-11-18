@@ -1,9 +1,9 @@
-use fea_rs::{typed::AstNode, NodeOrToken};
+use fea_rs::{NodeOrToken, typed::AstNode};
 
 use crate::{
-    stat::{StatDesignAxisStatement, StatStatement},
     AsFea, AttachStatement, Comment, FontRevisionStatement, GlyphClassDefStatement,
     LigatureCaretByIndexStatement, LigatureCaretByPosStatement, NameRecord, SHIFT,
+    stat::{StatDesignAxisStatement, StatStatement},
 };
 
 pub trait FeaTable {

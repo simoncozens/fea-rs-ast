@@ -3,7 +3,7 @@ use std::ops::Range;
 use fea_rs::typed::AstNode as _;
 use smol_str::SmolStr;
 
-use crate::{parse_namespec, AsFea, NameRecord, NameRecordKind, SHIFT};
+use crate::{AsFea, NameRecord, NameRecordKind, SHIFT, parse_namespec};
 
 /// A STAT table Design Axis
 #[derive(Debug, Clone, PartialEq, Eq)]

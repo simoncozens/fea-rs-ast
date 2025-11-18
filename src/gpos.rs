@@ -1,13 +1,13 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
 use crate::{
-    from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement,
-    ValueRecord,
+    Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement, ValueRecord,
+    from_anchor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

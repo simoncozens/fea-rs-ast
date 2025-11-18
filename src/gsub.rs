@@ -1,13 +1,13 @@
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
-use crate::{
-    contextual::{backtrack, context_glyphs, lookahead},
-    PotentiallyContextualStatement,
-};
 use crate::{AsFea, GlyphContainer};
+use crate::{
+    PotentiallyContextualStatement,
+    contextual::{backtrack, context_glyphs, lookahead},
+};
 use std::ops::Range;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

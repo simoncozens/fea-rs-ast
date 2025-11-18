@@ -11,7 +11,7 @@ mod tables;
 mod values;
 pub use contextual::*;
 pub use fea_rs;
-use fea_rs::{typed::AstNode as _, NodeOrToken, ParseTree};
+use fea_rs::{NodeOrToken, ParseTree, typed::AstNode as _};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -56,6 +56,7 @@ pub enum Statement {
     LigatureCaretByPos(LigatureCaretByPosStatement),
     MarkClassDefinition(MarkClassDefinition),
     Comment(Comment),
+    FeatureNameStatement(NameRecord),
     FontRevision(FontRevisionStatement),
     FeatureReference(FeatureReferenceStatement),
     GlyphClassDefinition(GlyphClassDefinition),
@@ -64,6 +65,7 @@ pub enum Statement {
     LookupFlag(LookupFlagStatement),
     LookupReference(LookupReferenceStatement),
     SizeParameters(SizeParameters),
+    SizeMenuName(NameRecord),
     Subtable(SubtableStatement),
     Script(ScriptStatement),
     // Tables and blocks
@@ -99,6 +101,7 @@ impl AsFea for Statement {
             Statement::Attach(at) => at.as_fea(indent),
             Statement::Comment(c) => c.as_fea(indent),
             Statement::FeatureReference(fr) => fr.as_fea(indent),
+            Statement::FeatureNameStatement(fr) => fr.as_fea(indent),
             Statement::FontRevision(fr) => fr.as_fea(indent),
             Statement::GlyphClassDef(gcd) => gcd.as_fea(indent),
             Statement::GlyphClassDefinition(gcd) => gcd.as_fea(indent),
@@ -110,6 +113,7 @@ impl AsFea for Statement {
             Statement::LookupReference(lr) => lr.as_fea(indent),
             Statement::MarkClassDefinition(mc) => mc.as_fea(indent),
             Statement::Script(sc) => sc.as_fea(indent),
+            Statement::SizeMenuName(sm) => sm.as_fea(indent),
             Statement::SizeParameters(sp) => sp.as_fea(indent),
             Statement::Subtable(st) => st.as_fea(indent),
             // Tables and blocks
@@ -201,6 +205,8 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
         Some(Statement::MarkClassDefinition(mcd.into()))
     } else if let Some(script) = fea_rs::typed::Script::cast(child) {
         Some(Statement::Script(script.into()))
+    } else if let Some(menuname) = fea_rs::typed::SizeMenuName::cast(child) {
+        Some(Statement::SizeMenuName(menuname.into()))
     } else if let Some(sizeparams) = fea_rs::typed::Parameters::cast(child) {
         Some(Statement::SizeParameters(sizeparams.into()))
     // Doesn't exist in fea_rs AST!
@@ -496,6 +502,9 @@ mod tests {
         #[exclude("ChainPosSubtable_fea")] // fontTools doesn't support it either
         #[exclude("AlternateChained.fea")] // fontTools doesn't support it either
         #[exclude("baseClass.fea")] // Fine, just the line breaks are different
+        #[exclude("STAT_bad.fea")] // Fine, just the line breaks are different
+        #[exclude("include0.fea")] // We don't process includes
+        #[exclude("GSUB_error.fea")] // Literally a parse failure
         path: std::path::PathBuf,
     ) {
         let fea_str = std::fs::read_to_string(&path).unwrap();

@@ -287,9 +287,7 @@ impl From<fea_rs::typed::Gpos8> for Statement {
         let mut context_glyphs = Vec::new();
         for context_glyph_node in context_glyph_nodes.iter() {
             let glyph_node = context_glyph_node.as_node().unwrap();
-            let glyph = glyph_node
-                .iter_children()
-                .find_map(GlyphOrClass::cast);
+            let glyph = glyph_node.iter_children().find_map(GlyphOrClass::cast);
             let value_record_node = glyph_node
                 .iter_children()
                 .find_map(fea_rs::typed::ValueRecord::cast);
@@ -297,15 +295,13 @@ impl From<fea_rs::typed::Gpos8> for Statement {
                 context_glyphs.push((goc.into(), vr.into()));
             }
         }
-        Statement::SinglePos(
-            crate::gpos::SinglePosStatement::new(
-                prefix,
-                suffix,
-                context_glyphs,
-                true,
-                val.node().range(),
-            )
-        )
+        Statement::SinglePos(crate::gpos::SinglePosStatement::new(
+            prefix,
+            suffix,
+            context_glyphs,
+            true,
+            val.node().range(),
+        ))
     }
 }
 
@@ -435,8 +431,8 @@ pub(crate) trait PotentiallyContextualStatement {
     fn suffix(&self) -> &[GlyphContainer];
     fn force_chain(&self) -> bool;
     fn format_begin(&self, indent: &str) -> String;
-    fn format_contextual_parts(&self, indent: &str) ->Vec<String>;
-    fn format_noncontextual_parts(&self, indent: &str) ->Vec<String>;
+    fn format_contextual_parts(&self, indent: &str) -> Vec<String>;
+    fn format_noncontextual_parts(&self, indent: &str) -> Vec<String>;
     fn format_end(&self, _indent: &str) -> String {
         "".to_string()
     }
@@ -462,18 +458,13 @@ impl<T: PotentiallyContextualStatement> AsFea for T {
                 res.push_str(&format!(" {}", suffix_str.join(" ")));
             }
         } else {
-            res.push_str(
-                self.format_noncontextual_parts(indent)
-                    .join(" ")
-                    .as_str(),
-            );
+            res.push_str(self.format_noncontextual_parts(indent).join(" ").as_str());
         }
         res.push_str(&self.format_end(indent));
         res.push(';');
         res
     }
 }
-
 
 #[cfg(test)]
 mod tests {

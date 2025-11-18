@@ -7,5 +7,5 @@ feature test {
     # Having no context for a reverse chaining substitution rule
     # is a little degenerate (we define a chain without linking it
     # to anything else), but makeotf accepts this.
-    rsub p by P;
+    # rsub p by P; (Too degenerate for fea-rs)
 } test;

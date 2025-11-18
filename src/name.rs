@@ -63,7 +63,10 @@ impl AsFea for NameRecord {
         } else if self.platform_id == 1 && self.plat_enc_id == 0 && self.lang_id == 0 {
             "1 "
         } else {
-            &format!("{} {} {}", self.platform_id, self.plat_enc_id, self.lang_id)
+            &format!(
+                "{} {} {} ",
+                self.platform_id, self.plat_enc_id, self.lang_id
+            )
         };
         match self.kind {
             NameRecordKind::Name(id) => format!("nameid {} {}\"{}\";", id, plat, escaped),
@@ -201,6 +204,24 @@ fn escape_string(s: &str) -> String {
             }
         })
         .collect()
+}
+
+impl From<fea_rs::typed::SizeMenuName> for NameRecord {
+    fn from(val: fea_rs::typed::SizeMenuName) -> Self {
+        // Get the NameSpec which contains platform info and string
+        let name_spec = val.iter().find_map(fea_rs::typed::NameSpec::cast).unwrap();
+
+        let (platform_id, plat_enc_id, lang_id, string) = parse_namespec(name_spec);
+
+        Self::new(
+            platform_id,
+            plat_enc_id,
+            lang_id,
+            string,
+            NameRecordKind::FeatureSizeMenuName,
+            val.range(),
+        )
+    }
 }
 
 #[cfg(test)]
