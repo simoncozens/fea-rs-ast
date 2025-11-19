@@ -1,18 +1,18 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
 use crate::{
-    Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement, ValueRecord,
-    from_anchor,
+    from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement,
+    ValueRecord,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
-    pub pos: Vec<(GlyphContainer, ValueRecord)>,
+    pub pos: Vec<(GlyphContainer, Option<ValueRecord>)>,
     pub prefix: Vec<GlyphContainer>,
     pub suffix: Vec<GlyphContainer>,
     pub force_chain: bool,
@@ -23,7 +23,7 @@ impl SinglePosStatement {
     pub fn new(
         prefix: Vec<GlyphContainer>,
         suffix: Vec<GlyphContainer>,
-        pos: Vec<(GlyphContainer, ValueRecord)>,
+        pos: Vec<(GlyphContainer, Option<ValueRecord>)>,
         force_chain: bool,
         location: Range<usize>,
     ) -> Self {
@@ -55,14 +55,30 @@ impl PotentiallyContextualStatement for SinglePosStatement {
     fn format_contextual_parts(&self, indent: &str) -> Vec<String> {
         self.pos
             .iter()
-            .map(|(p, vr)| format!("{}' {}", p.as_fea(""), vr.as_fea(indent)))
+            .map(|(p, vr)| {
+                format!(
+                    "{}'{}",
+                    p.as_fea(""),
+                    vr.as_ref()
+                        .map(|v| format!(" {}", v.as_fea(indent)))
+                        .unwrap_or_default()
+                )
+            })
             .collect()
     }
 
     fn format_noncontextual_parts(&self, indent: &str) -> Vec<String> {
         self.pos
             .iter()
-            .map(|(p, vr)| format!("{} {}", p.as_fea(""), vr.as_fea(indent)))
+            .map(|(p, vr)| {
+                format!(
+                    "{} {}",
+                    p.as_fea(""),
+                    vr.as_ref()
+                        .map(|v| v.as_fea(indent).to_string())
+                        .unwrap_or("<NULL>".to_string())
+                )
+            })
             .collect()
     }
 }
@@ -77,7 +93,7 @@ impl From<fea_rs::typed::Gpos1> for SinglePosStatement {
         Self::new(
             vec![],
             vec![],
-            vec![(target.into(), value_record.into())],
+            vec![(target.into(), Some(value_record.into()))],
             false,
             val.node().range(),
         )
@@ -503,7 +519,7 @@ mod tests {
             vec![],
             vec![(
                 GlyphContainer::GlyphName(GlyphName::new("A")),
-                ValueRecord {
+                Some(ValueRecord {
                     x_advance: Some(50),
                     y_advance: None,
                     x_placement: None,
@@ -514,7 +530,7 @@ mod tests {
                     y_advance_device: None,
                     vertical: false,
                     location: 0..0,
-                },
+                }),
             )],
             false,
             0..10,

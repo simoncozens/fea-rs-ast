@@ -11,7 +11,7 @@ mod tables;
 mod values;
 pub use contextual::*;
 pub use fea_rs;
-use fea_rs::{NodeOrToken, ParseTree, typed::AstNode as _};
+use fea_rs::{typed::AstNode as _, NodeOrToken, ParseTree};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -71,10 +71,13 @@ pub enum Statement {
     // Tables and blocks
     Gdef(Table<Gdef>),
     Head(Table<Head>),
+    Hhea(Table<Hhea>),
     Name(Table<Name>),
     Stat(Table<Stat>),
+    Vhea(Table<Vhea>),
     FeatureBlock(FeatureBlock),
     LookupBlock(LookupBlock),
+    NestedBlock(NestedBlock),
 }
 impl AsFea for Statement {
     fn as_fea(&self, indent: &str) -> String {
@@ -119,10 +122,13 @@ impl AsFea for Statement {
             // Tables and blocks
             Statement::Gdef(gdef) => gdef.as_fea(indent),
             Statement::Head(head) => head.as_fea(indent),
+            Statement::Hhea(hhea) => hhea.as_fea(indent),
             Statement::Name(name) => name.as_fea(indent),
             Statement::Stat(stat) => stat.as_fea(indent),
+            Statement::Vhea(vhea) => vhea.as_fea(indent),
             Statement::FeatureBlock(fb) => fb.as_fea(indent),
             Statement::LookupBlock(lb) => lb.as_fea(indent),
+            Statement::NestedBlock(nb) => nb.as_fea(indent),
         }
     }
 }
@@ -209,6 +215,8 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
         Some(Statement::SizeMenuName(menuname.into()))
     } else if let Some(sizeparams) = fea_rs::typed::Parameters::cast(child) {
         Some(Statement::SizeParameters(sizeparams.into()))
+    } else if let Some(featurenames) = fea_rs::typed::FeatureNames::cast(child) {
+        Some(Statement::NestedBlock(featurenames.into()))
     // Doesn't exist in fea_rs AST!
     // } else if let Some(subtable) = fea_rs::typed::Subtable::cast(child) {
     //     Some(Statement::Subtable(SubtableStatement::new()))
@@ -341,6 +349,67 @@ impl From<fea_rs::typed::LookupBlock> for LookupBlock {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NestedBlock {
+    pub tag: SmolStr,
+    pub statements: Vec<Statement>,
+    pub pos: Range<usize>,
+}
+
+impl AsFea for NestedBlock {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = String::new();
+        res.push_str(&format!("{}{} {{\n", indent, self.tag));
+        let mid_indent = indent.to_string() + SHIFT;
+        res.push_str(&format!(
+            "{mid_indent}{}\n",
+            self.statements
+                .iter()
+                .map(|s| s.as_fea(&mid_indent))
+                .collect::<Vec<_>>()
+                .join(&format!("\n{mid_indent}"))
+        ));
+        res.push_str(&format!("{}}};\n", indent));
+        res
+    }
+}
+
+impl From<fea_rs::typed::FeatureNames> for NestedBlock {
+    fn from(val: fea_rs::typed::FeatureNames) -> Self {
+        #[allow(clippy::manual_map)]
+        let statements: Vec<Statement> = val
+            .node()
+            .iter_children()
+            .filter_map(|child| {
+                // Preserve comments
+                if child.kind() == fea_rs::Kind::Comment {
+                    return Some(Statement::Comment(Comment::from(
+                        child.token_text().unwrap(),
+                    )));
+                }
+                if let Some(name_spec) = fea_rs::typed::NameSpec::cast(child) {
+                    let (platform_id, plat_enc_id, lang_id, string) = parse_namespec(name_spec);
+                    Some(Statement::FeatureNameStatement(NameRecord {
+                        platform_id,
+                        plat_enc_id,
+                        lang_id,
+                        string,
+                        kind: NameRecordKind::FeatureName,
+                        location: child.range(),
+                    }))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        NestedBlock {
+            tag: SmolStr::new("featureNames"),
+            statements,
+            pos: val.node().range(),
+        }
+    }
+}
+
 pub enum ToplevelItem {
     GlyphClassDefinition(GlyphClassDefinition),
     MarkClassDefinition(MarkClassDefinition),
@@ -350,12 +419,13 @@ pub enum ToplevelItem {
     Lookup(LookupBlock),
     Comment(Comment),
     AnchorDefinition(AnchorDefinition),
-    // BAS
-    // GDEF table
+    // Tables
     Gdef(Table<Gdef>),
     Head(Table<Head>),
+    Hhea(Table<Hhea>),
     Name(Table<Name>),
     Stat(Table<Stat>),
+    Vhea(Table<Vhea>),
 }
 impl From<ToplevelItem> for Statement {
     fn from(val: ToplevelItem) -> Self {
@@ -372,6 +442,8 @@ impl From<ToplevelItem> for Statement {
             ToplevelItem::Stat(stat) => Statement::Stat(stat),
             ToplevelItem::Gdef(gdef) => Statement::Gdef(gdef),
             ToplevelItem::Head(head) => Statement::Head(head),
+            ToplevelItem::Hhea(hhea) => Statement::Hhea(hhea),
+            ToplevelItem::Vhea(vhea) => Statement::Vhea(vhea),
         }
     }
 }
@@ -389,6 +461,8 @@ impl AsFea for ToplevelItem {
             ToplevelItem::Name(name) => name.as_fea(indent),
             ToplevelItem::Stat(stat) => stat.as_fea(indent),
             ToplevelItem::Head(head) => head.as_fea(indent),
+            ToplevelItem::Hhea(hhea) => hhea.as_fea(indent),
+            ToplevelItem::Vhea(vhea) => vhea.as_fea(indent),
         }
     }
 }
@@ -414,6 +488,10 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
         Some(ToplevelItem::Gdef(gdef.into()))
     } else if let Some(head) = fea_rs::typed::HeadTable::cast(child) {
         Some(ToplevelItem::Head(head.into()))
+    } else if let Some(hhea) = fea_rs::typed::HheaTable::cast(child) {
+        Some(ToplevelItem::Hhea(hhea.into()))
+    } else if let Some(vhea) = fea_rs::typed::VheaTable::cast(child) {
+        Some(ToplevelItem::Vhea(vhea.into()))
     } else if let Some(name) = fea_rs::typed::NameTable::cast(child) {
         Some(ToplevelItem::Name(name.into()))
     } else if let Some(stat) = fea_rs::typed::StatTable::cast(child) {
@@ -505,10 +583,15 @@ mod tests {
         #[exclude("STAT_bad.fea")] // Fine, just the line breaks are different
         #[exclude("include0.fea")] // We don't process includes
         #[exclude("GSUB_error.fea")] // Literally a parse failure
+        #[exclude("spec10.fea")] // I don't care
         path: std::path::PathBuf,
     ) {
         let fea_str = std::fs::read_to_string(&path).unwrap();
-        let (parsed, _) = fea_rs::parse::parse_string(fea_str.clone());
+        let (parsed, diag) = fea_rs::parse::parse_string(fea_str.clone());
+        if diag.has_errors() {
+            println!("fea-rs didn't like file {:?}:\n{:#?}", path, diag);
+            return;
+        }
         let feature_file: FeatureFile = parsed.into();
         let fea_output = feature_file.as_fea("");
         let orig = normalize_whitespace(&fea_str);

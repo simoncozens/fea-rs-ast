@@ -125,9 +125,34 @@ impl From<fea_rs::typed::GlyphClass> for GlyphClass {
 impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
     fn from(val: fea_rs::typed::GlyphClassLiteral) -> Self {
         let members: Vec<GlyphContainer> = val
-            .iter()
-            .filter_map(GlyphOrClass::cast)
-            .map(|goc| goc.into())
+            .node()
+            .iter_children()
+            .flat_map(|child| {
+                if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
+                    Some(gc.into())
+                } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
+                    let start = gr
+                        .iter()
+                        .find_map(fea_rs::typed::GlyphName::cast)
+                        .map(|gn| SmolStr::new(gn.text()))
+                        .unwrap();
+                    let end = gr
+                        .iter()
+                        .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
+                        .find_map(fea_rs::typed::GlyphName::cast)
+                        .map(|gn| SmolStr::new(gn.text()))
+                        .unwrap();
+
+                    Some(GlyphContainer::GlyphRange(start..end))
+                // "GlyphNameOrRange" doesn't go into the typed AST, we have to handle it ourselves
+                } else if child.kind() == fea_rs::Kind::GlyphNameOrRange {
+                    Some(GlyphContainer::GlyphNameOrRange(
+                        child.token_text().unwrap().into(),
+                    ))
+                } else {
+                    None
+                }
+            })
             .collect();
         GlyphClass::new(members, val.node().range())
     }
@@ -139,6 +164,7 @@ pub enum GlyphContainer {
     GlyphClass(GlyphClass),
     GlyphClassName(SmolStr),
     GlyphRange(Range<SmolStr>),
+    GlyphNameOrRange(SmolStr),
 }
 
 impl AsFea for GlyphContainer {
@@ -159,6 +185,7 @@ impl AsFea for GlyphContainer {
             GlyphContainer::GlyphRange(range) => {
                 format!("{} - {}", range.start.as_str(), range.end.as_str())
             }
+            GlyphContainer::GlyphNameOrRange(name_or_range) => name_or_range.to_string(),
         }
     }
 }
@@ -168,35 +195,7 @@ impl From<fea_rs::typed::GlyphOrClass> for GlyphContainer {
         match val {
             GlyphOrClass::Glyph(glyph) => GlyphContainer::GlyphName(GlyphName::new(glyph.text())),
             GlyphOrClass::Class(glyph_class_literal) => {
-                let members: Vec<GlyphContainer> = glyph_class_literal
-                    .node()
-                    .iter_children()
-                    .flat_map(|child| {
-                        if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
-                            Some(gc.into())
-                        } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
-                            let start = gr
-                                .iter()
-                                .find_map(fea_rs::typed::GlyphName::cast)
-                                .map(|gn| SmolStr::new(gn.text()))
-                                .unwrap();
-                            let end = gr
-                                .iter()
-                                .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
-                                .find_map(fea_rs::typed::GlyphName::cast)
-                                .map(|gn| SmolStr::new(gn.text()))
-                                .unwrap();
-
-                            Some(GlyphContainer::GlyphRange(start..end))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                GlyphContainer::GlyphClass(GlyphClass::new(
-                    members,
-                    glyph_class_literal.node().range(),
-                ))
+                GlyphContainer::GlyphClass(glyph_class_literal.into())
             }
             GlyphOrClass::Cid(cid) => todo!(),
             GlyphOrClass::NamedClass(glyph_class_name) => {
@@ -214,35 +213,7 @@ impl From<fea_rs::typed::GlyphClass> for GlyphContainer {
                 GlyphContainer::GlyphClassName(SmolStr::new(glyph_class_name.text()))
             }
             fea_rs::typed::GlyphClass::Literal(glyph_class_literal) => {
-                let members: Vec<GlyphContainer> = glyph_class_literal
-                    .node()
-                    .iter_children()
-                    .flat_map(|child| {
-                        if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
-                            Some(gc.into())
-                        } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
-                            let start = gr
-                                .iter()
-                                .find_map(fea_rs::typed::GlyphName::cast)
-                                .map(|gn| SmolStr::new(gn.text()))
-                                .unwrap();
-                            let end = gr
-                                .iter()
-                                .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
-                                .find_map(fea_rs::typed::GlyphName::cast)
-                                .map(|gn| SmolStr::new(gn.text()))
-                                .unwrap();
-
-                            Some(GlyphContainer::GlyphRange(start..end))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                GlyphContainer::GlyphClass(GlyphClass::new(
-                    members,
-                    glyph_class_literal.node().range(),
-                ))
+                GlyphContainer::GlyphClass(glyph_class_literal.into())
             }
         }
     }
@@ -276,5 +247,29 @@ impl From<fea_rs::typed::GlyphClassDef> for MarkClass {
             .find_map(fea_rs::typed::GlyphClassName::cast)
             .unwrap();
         MarkClass::new(label.text().trim_start_matches('@'))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_glyphclass() {
+        const FEA: &str = "@foo = [a-b c d-e @bar];";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let definition = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::GlyphClassDef::cast)
+            .unwrap();
+        let literal = definition
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::GlyphClassLiteral::cast)
+            .unwrap();
+        println!("{:#?}", literal);
+        let glyphs: GlyphClass = literal.into();
+        assert_eq!(glyphs.glyphs.len(), 4);
     }
 }

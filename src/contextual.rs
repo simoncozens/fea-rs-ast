@@ -291,8 +291,8 @@ impl From<fea_rs::typed::Gpos8> for Statement {
             let value_record_node = glyph_node
                 .iter_children()
                 .find_map(fea_rs::typed::ValueRecord::cast);
-            if let (Some(goc), Some(vr)) = (glyph, value_record_node) {
-                context_glyphs.push((goc.into(), vr.into()));
+            if let Some(goc) = glyph {
+                context_glyphs.push((goc.into(), value_record_node.map(|vr|vr.into())));
             }
         }
         Statement::SinglePos(crate::gpos::SinglePosStatement::new(
