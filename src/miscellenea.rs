@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, Tag};
 
-use crate::{Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, from_anchor};
+use crate::{from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass};
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -546,9 +546,9 @@ impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
 /// Python `fontTools` representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkClassDefinition {
-    mark_class: MarkClass,
-    anchor: crate::Anchor,
-    glyphs: GlyphContainer,
+    pub mark_class: MarkClass,
+    pub anchor: crate::Anchor,
+    pub glyphs: GlyphContainer,
 }
 impl MarkClassDefinition {
     pub fn new(mark_class: MarkClass, anchor: crate::Anchor, glyphs: GlyphContainer) -> Self {

@@ -3,9 +3,7 @@ use std::ops::Range;
 use fea_rs::{typed::AstNode, NodeOrToken};
 
 use crate::{
-    stat::StatStatement, AsFea, AttachStatement, Comment, FontRevisionStatement,
-    GlyphClassDefStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement, NameRecord,
-    SHIFT,
+    stat::StatStatement, AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT,
 };
 
 pub trait FeaTable {
@@ -76,28 +74,6 @@ impl From<fea_rs::typed::GdefTable> for Table<Gdef> {
     fn from(val: fea_rs::typed::GdefTable) -> Self {
         Self {
             statements: Gdef::statements_from_node(val.node()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GdefStatement {
-    Attach(AttachStatement),
-    GlyphClassDef(GlyphClassDefStatement),
-    LigatureCaretByIndex(LigatureCaretByIndexStatement),
-    LigatureCaretByPos(LigatureCaretByPosStatement),
-    Comment(Comment),
-    // Include(IncludeStatement),
-}
-impl AsFea for GdefStatement {
-    fn as_fea(&self, indent: &str) -> String {
-        match self {
-            GdefStatement::Attach(stmt) => stmt.as_fea(indent),
-            GdefStatement::GlyphClassDef(stmt) => stmt.as_fea(indent),
-            GdefStatement::LigatureCaretByIndex(stmt) => stmt.as_fea(indent),
-            GdefStatement::LigatureCaretByPos(stmt) => stmt.as_fea(indent),
-            GdefStatement::Comment(cmt) => cmt.as_fea(indent),
-            // GdefStatement::Include(stmt) => stmt.as_fea(indent),
         }
     }
 }

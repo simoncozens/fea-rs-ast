@@ -219,6 +219,19 @@ impl From<fea_rs::typed::GlyphClass> for GlyphContainer {
     }
 }
 
+impl GlyphContainer {
+    pub fn new_class(glyph_names: &[&str]) -> Self {
+        let members: Vec<GlyphContainer> = glyph_names
+            .iter()
+            .map(|name| GlyphContainer::GlyphName(GlyphName::new(name)))
+            .collect();
+        GlyphContainer::GlyphClass(GlyphClass::new(
+            members,
+            0..0, // location is not relevant here
+        ))
+    }
+}
+
 /// The name of a mark class
 ///
 /// Note that this differs from the Python `fontTools` representation. In

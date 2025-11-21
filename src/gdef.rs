@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::AstNode as _;
 
-use crate::{AsFea, GlyphContainer};
+use crate::{AsFea, Comment, GlyphContainer, Statement};
 
 /// A ``GDEF`` table ``Attach`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -238,6 +238,55 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByPosStatement {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GdefStatement {
+    Attach(AttachStatement),
+    GlyphClassDef(GlyphClassDefStatement),
+    LigatureCaretByIndex(LigatureCaretByIndexStatement),
+    LigatureCaretByPos(LigatureCaretByPosStatement),
+    Comment(Comment),
+    // Include(IncludeStatement),
+}
+impl AsFea for GdefStatement {
+    fn as_fea(&self, indent: &str) -> String {
+        match self {
+            GdefStatement::Attach(stmt) => stmt.as_fea(indent),
+            GdefStatement::GlyphClassDef(stmt) => stmt.as_fea(indent),
+            GdefStatement::LigatureCaretByIndex(stmt) => stmt.as_fea(indent),
+            GdefStatement::LigatureCaretByPos(stmt) => stmt.as_fea(indent),
+            GdefStatement::Comment(cmt) => cmt.as_fea(indent),
+            // GdefStatement::Include(stmt) => stmt.as_fea(indent),
+        }
+    }
+}
+impl Into<Statement> for GdefStatement {
+    fn into(self) -> Statement {
+        match self {
+            GdefStatement::Attach(stmt) => Statement::GdefAttach(stmt),
+            GdefStatement::GlyphClassDef(stmt) => Statement::GlyphClassDef(stmt),
+            GdefStatement::LigatureCaretByIndex(stmt) => Statement::GdefLigatureCaretByIndex(stmt),
+            GdefStatement::LigatureCaretByPos(stmt) => Statement::GdefLigatureCaretByPos(stmt),
+            GdefStatement::Comment(cmt) => Statement::Comment(cmt),
+            // GdefStatement::Include(stmt) => Statement::Include(stmt),
+        }
+    }
+}
+impl TryFrom<Statement> for GdefStatement {
+    type Error = crate::CannotConvertError;
+    fn try_from(value: Statement) -> Result<Self, Self::Error> {
+        match value {
+            Statement::GdefAttach(stmt) => Ok(GdefStatement::Attach(stmt)),
+            Statement::GdefClassDef(stmt) => Ok(GdefStatement::GlyphClassDef(stmt)),
+            Statement::GdefLigatureCaretByIndex(stmt) => {
+                Ok(GdefStatement::LigatureCaretByIndex(stmt))
+            }
+            Statement::GdefLigatureCaretByPos(stmt) => Ok(GdefStatement::LigatureCaretByPos(stmt)),
+            Statement::Comment(cmt) => Ok(GdefStatement::Comment(cmt)),
+            // Statement::Include(stmt) => Ok(GdefStatement::Include(stmt)),
+            _ => Err(crate::CannotConvertError),
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

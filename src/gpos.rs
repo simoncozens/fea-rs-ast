@@ -102,12 +102,12 @@ impl From<fea_rs::typed::Gpos1> for SinglePosStatement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairPosStatement {
-    glyphs_1: GlyphContainer,
-    glyphs_2: GlyphContainer,
-    value_record_1: ValueRecord,
-    value_record_2: Option<ValueRecord>,
-    enumerated: bool,
-    location: Range<usize>,
+    pub glyphs_1: GlyphContainer,
+    pub glyphs_2: GlyphContainer,
+    pub value_record_1: ValueRecord,
+    pub value_record_2: Option<ValueRecord>,
+    pub enumerated: bool,
+    pub location: Range<usize>,
 }
 
 impl PairPosStatement {
@@ -432,9 +432,9 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkMarkPosStatement {
-    base_marks: GlyphContainer,
-    marks: Vec<(Anchor, MarkClass)>,
-    location: Range<usize>,
+    pub base_marks: GlyphContainer,
+    pub marks: Vec<(Anchor, MarkClass)>,
+    pub location: Range<usize>,
 }
 
 impl MarkMarkPosStatement {

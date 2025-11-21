@@ -1,5 +1,11 @@
-use std::ops::Range;
+use std::{
+    ops::Range,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 mod contextual;
+mod dummyresolver;
+mod error;
 mod gdef;
 mod glyphcontainers;
 mod gpos;
@@ -9,9 +15,11 @@ mod name;
 mod stat;
 mod tables;
 mod values;
+mod visitor;
 pub use contextual::*;
+pub use error::CannotConvertError;
 pub use fea_rs;
-use fea_rs::{typed::AstNode as _, NodeOrToken, ParseTree};
+use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, NodeOrToken, ParseTree};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -22,6 +30,7 @@ use smol_str::SmolStr;
 use stat::*;
 pub use tables::*;
 pub use values::*;
+pub use visitor::LayoutVisitor;
 
 pub(crate) const SHIFT: &str = "    ";
 
@@ -29,6 +38,10 @@ pub trait AsFea {
     fn as_fea(&self, indent: &str) -> String;
 }
 
+// All possible statements in a feature file need to go
+// here, regardless of context, because we need to be able to
+// treat them as a heterogeneous collection when we do visiting etc.
+// We split them up by context in later enums.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     // GSUB statements
@@ -78,6 +91,11 @@ pub enum Statement {
     FeatureBlock(FeatureBlock),
     LookupBlock(LookupBlock),
     NestedBlock(NestedBlock),
+    // GDEF-related statements
+    GdefAttach(AttachStatement),
+    GdefClassDef(GlyphClassDefStatement),
+    GdefLigatureCaretByIndex(LigatureCaretByIndexStatement),
+    GdefLigatureCaretByPos(LigatureCaretByPosStatement),
 }
 impl AsFea for Statement {
     fn as_fea(&self, indent: &str) -> String {
@@ -119,6 +137,11 @@ impl AsFea for Statement {
             Statement::SizeMenuName(sm) => sm.as_fea(indent),
             Statement::SizeParameters(sp) => sp.as_fea(indent),
             Statement::Subtable(st) => st.as_fea(indent),
+            // GDEF-related statements
+            Statement::GdefAttach(at) => at.as_fea(indent),
+            Statement::GdefClassDef(gcd) => gcd.as_fea(indent),
+            Statement::GdefLigatureCaretByIndex(lc) => lc.as_fea(indent),
+            Statement::GdefLigatureCaretByPos(lc) => lc.as_fea(indent),
             // Tables and blocks
             Statement::Gdef(gdef) => gdef.as_fea(indent),
             Statement::Head(head) => head.as_fea(indent),
@@ -259,14 +282,14 @@ impl AsFea for FeatureBlock {
         res.push_str(&format!("{}feature {} {{\n", indent, self.name));
         let mid_indent = indent.to_string() + SHIFT;
         res.push_str(&format!(
-            "{mid_indent}{}\n",
+            "{}\n",
             self.statements
                 .iter()
                 .map(|s| s.as_fea(&mid_indent))
                 .collect::<Vec<_>>()
                 .join(&format!("\n{mid_indent}"))
         ));
-        res.push_str(&format!("{}}} {};\n", indent, self.name));
+        res.push_str(&format!("{}}} {};", indent, self.name));
         res
     }
 }
@@ -324,7 +347,7 @@ impl AsFea for LookupBlock {
                 .collect::<Vec<_>>()
                 .join(&format!("\n{mid_indent}"))
         ));
-        res.push_str(&format!("{}}} {};\n", indent, self.name));
+        res.push_str(&format!("{}}} {};", indent, self.name));
         res
     }
 }
@@ -410,6 +433,7 @@ impl From<fea_rs::typed::FeatureNames> for NestedBlock {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToplevelItem {
     GlyphClassDefinition(GlyphClassDefinition),
     MarkClassDefinition(MarkClassDefinition),
@@ -447,6 +471,29 @@ impl From<ToplevelItem> for Statement {
         }
     }
 }
+impl TryFrom<Statement> for ToplevelItem {
+    type Error = CannotConvertError;
+
+    fn try_from(value: Statement) -> Result<Self, Self::Error> {
+        match value {
+            Statement::GlyphClassDefinition(gcd) => Ok(ToplevelItem::GlyphClassDefinition(gcd)),
+            Statement::MarkClassDefinition(mcd) => Ok(ToplevelItem::MarkClassDefinition(mcd)),
+            Statement::LanguageSystem(ls) => Ok(ToplevelItem::LanguageSystem(ls)),
+            Statement::FeatureBlock(fb) => Ok(ToplevelItem::Feature(fb)),
+            Statement::LookupBlock(lb) => Ok(ToplevelItem::Lookup(lb)),
+            Statement::Comment(cmt) => Ok(ToplevelItem::Comment(cmt)),
+            Statement::AnchorDefinition(ad) => Ok(ToplevelItem::AnchorDefinition(ad)),
+            Statement::Gdef(gdef) => Ok(ToplevelItem::Gdef(gdef)),
+            Statement::Name(name) => Ok(ToplevelItem::Name(name)),
+            Statement::Stat(stat) => Ok(ToplevelItem::Stat(stat)),
+            Statement::Head(head) => Ok(ToplevelItem::Head(head)),
+            Statement::Hhea(hhea) => Ok(ToplevelItem::Hhea(hhea)),
+            Statement::Vhea(vhea) => Ok(ToplevelItem::Vhea(vhea)),
+            _ => Err(CannotConvertError),
+        }
+    }
+}
+
 impl AsFea for ToplevelItem {
     fn as_fea(&self, indent: &str) -> String {
         match self {
@@ -512,6 +559,43 @@ impl FeatureFile {
     pub fn iter(&self) -> impl Iterator<Item = &ToplevelItem> {
         self.statements.iter()
     }
+
+    pub fn new_from_fea(
+        features: &str,
+        glyph_names: Option<&[&str]>,
+        project_root: Option<impl Into<PathBuf>>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let glyph_map = glyph_names
+            .map(|gn| {
+                let mut list = gn.join("\n");
+                list.push('\n');
+                if !list.starts_with(".notdef\n") {
+                    list = ".notdef\n".to_string() + &list;
+                }
+                fea_rs::compile::parse_glyph_order(&list)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            })
+            .transpose()?;
+        let resolver: Box<dyn fea_rs::parse::SourceResolver> =
+            if let Some(project_root) = project_root {
+                Box::new(FileSystemResolver::new(project_root.into()))
+            } else {
+                Box::new(dummyresolver::DummyResolver)
+            };
+        let features_text: Arc<str> = Arc::from(features);
+        let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
+            "get_parse_tree".into(),
+            glyph_map.as_ref(),
+            Box::new(move |s: &Path| {
+                if s == Path::new("get_parse_tree") {
+                    Ok(features_text.clone())
+                } else {
+                    resolver.get_contents(s)
+                }
+            }),
+        )?;
+        Ok(parse_tree.into())
+    }
 }
 impl AsFea for FeatureFile {
     fn as_fea(&self, indent: &str) -> String {
@@ -531,6 +615,23 @@ impl From<ParseTree> for FeatureFile {
             .filter_map(to_toplevel_item)
             .collect();
         FeatureFile { statements }
+    }
+}
+
+/// Turn a string into a FeatureFile
+///
+/// Only suitable for simple cases and testing; does not resolve glyph name
+/// ranges or includes.
+impl TryFrom<&str> for FeatureFile {
+    type Error = fea_rs::DiagnosticSet;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let (parsed, diag) = fea_rs::parse::parse_string(value);
+        if diag.has_errors() {
+            Err(diag)
+        } else {
+            Ok(parsed.into())
+        }
     }
 }
 #[cfg(test)]

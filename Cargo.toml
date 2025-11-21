@@ -5,7 +5,7 @@ edition = "2024"
 description = "fontTools-like AST wrapper around fea-rs parser"
 
 [dependencies]
-fea-rs = { version = "0.21.0" }
+fea-rs = { git = "https://github.com/googlefonts/fontc.git" }
 smol_str = "0.3.4"
 [dev-dependencies]
 pretty_assertions = "1.4.1"
