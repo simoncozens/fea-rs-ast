@@ -263,7 +263,7 @@ impl From<GdefStatement> for Statement {
     fn from(val: GdefStatement) -> Self {
         match val {
             GdefStatement::Attach(stmt) => Statement::GdefAttach(stmt),
-            GdefStatement::GlyphClassDef(stmt) => Statement::GlyphClassDef(stmt),
+            GdefStatement::GlyphClassDef(stmt) => Statement::GdefClassDef(stmt),
             GdefStatement::LigatureCaretByIndex(stmt) => Statement::GdefLigatureCaretByIndex(stmt),
             GdefStatement::LigatureCaretByPos(stmt) => Statement::GdefLigatureCaretByPos(stmt),
             GdefStatement::Comment(cmt) => Statement::Comment(cmt),

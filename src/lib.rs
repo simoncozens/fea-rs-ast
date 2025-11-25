@@ -66,10 +66,6 @@ pub enum Statement {
     IgnorePos(IgnoreStatement<Pos>),
     // Miscellenea
     AnchorDefinition(AnchorDefinition),
-    Attach(AttachStatement),
-    GlyphClassDef(GlyphClassDefStatement),
-    LigatureCaretByIndex(LigatureCaretByIndexStatement),
-    LigatureCaretByPos(LigatureCaretByPosStatement),
     MarkClassDefinition(MarkClassDefinition),
     Comment(Comment),
     FeatureNameStatement(NameRecord),
@@ -127,17 +123,13 @@ impl AsFea for Statement {
             Statement::IgnorePos(ip) => ip.as_fea(indent),
             // Miscellenea
             Statement::AnchorDefinition(ad) => ad.as_fea(indent),
-            Statement::Attach(at) => at.as_fea(indent),
             Statement::Comment(c) => c.as_fea(indent),
             Statement::FeatureReference(fr) => fr.as_fea(indent),
             Statement::FeatureNameStatement(fr) => fr.as_fea(indent),
             Statement::FontRevision(fr) => fr.as_fea(indent),
-            Statement::GlyphClassDef(gcd) => gcd.as_fea(indent),
             Statement::GlyphClassDefinition(gcd) => gcd.as_fea(indent),
             Statement::Language(ls) => ls.as_fea(indent),
             Statement::LanguageSystem(ls) => ls.as_fea(indent),
-            Statement::LigatureCaretByIndex(lc) => lc.as_fea(indent),
-            Statement::LigatureCaretByPos(lc) => lc.as_fea(indent),
             Statement::LookupFlag(lf) => lf.as_fea(indent),
             Statement::LookupReference(lr) => lr.as_fea(indent),
             Statement::MarkClassDefinition(mc) => mc.as_fea(indent),
@@ -214,9 +206,9 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
     } else if let Some(ad) = fea_rs::typed::AnchorDef::cast(child) {
         Some(Statement::AnchorDefinition(ad.into()))
     } else if let Some(at) = fea_rs::typed::GdefAttach::cast(child) {
-        Some(Statement::Attach(at.into()))
+        Some(Statement::GdefAttach(at.into()))
     } else if let Some(gcd) = fea_rs::typed::GdefClassDef::cast(child) {
-        Some(Statement::GlyphClassDef(gcd.into()))
+        Some(Statement::GdefClassDef(gcd.into()))
     } else if let Some(lc) = fea_rs::typed::GdefLigatureCaret::cast(child) {
         // Check if it's by position or by index based on the first keyword
         let is_by_pos = lc
@@ -225,9 +217,9 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
             .map(|t| t.kind() == fea_rs::Kind::LigatureCaretByPosKw)
             .unwrap_or(false);
         if is_by_pos {
-            Some(Statement::LigatureCaretByPos(lc.into()))
+            Some(Statement::GdefLigatureCaretByPos(lc.into()))
         } else {
-            Some(Statement::LigatureCaretByIndex(lc.into()))
+            Some(Statement::GdefLigatureCaretByIndex(lc.into()))
         }
     } else if let Some(fr) = fea_rs::typed::FeatureRef::cast(child) {
         Some(Statement::FeatureReference(fr.into()))
