@@ -4,8 +4,8 @@
 
 use crate::{AsFea, FeaTable, Table};
 use fea_rs::{
-    typed::{AstNode as _, ScriptRecord},
     Kind, NodeOrToken,
+    typed::{AstNode as _, ScriptRecord},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

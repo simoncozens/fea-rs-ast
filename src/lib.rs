@@ -13,6 +13,7 @@ mod gpos;
 mod gsub;
 mod miscellenea;
 mod name;
+mod os2;
 mod stat;
 mod tables;
 mod values;
@@ -32,7 +33,7 @@ pub use tables::*;
 pub use values::*;
 pub use visitor::LayoutVisitor;
 
-use crate::base::Base;
+use crate::{base::Base, os2::Os2};
 
 pub(crate) const SHIFT: &str = "    ";
 
@@ -92,6 +93,7 @@ pub enum Statement {
     Head(Table<Head>),
     Hhea(Table<Hhea>),
     Name(Table<Name>),
+    Os2(Table<Os2>),
     Stat(Table<Stat>),
     Vhea(Table<Vhea>),
     FeatureBlock(FeatureBlock),
@@ -157,6 +159,7 @@ impl AsFea for Statement {
             Statement::Head(head) => head.as_fea(indent),
             Statement::Hhea(hhea) => hhea.as_fea(indent),
             Statement::Name(name) => name.as_fea(indent),
+            Statement::Os2(os2) => os2.as_fea(indent),
             Statement::Stat(stat) => stat.as_fea(indent),
             Statement::Vhea(vhea) => vhea.as_fea(indent),
             Statement::FeatureBlock(fb) => fb.as_fea(indent),
@@ -467,6 +470,7 @@ pub enum ToplevelItem {
     Head(Table<Head>),
     Hhea(Table<Hhea>),
     Name(Table<Name>),
+    Os2(Table<Os2>),
     Stat(Table<Stat>),
     Vhea(Table<Vhea>),
 }
@@ -489,6 +493,7 @@ impl From<ToplevelItem> for Statement {
             ToplevelItem::Head(head) => Statement::Head(head),
             ToplevelItem::Hhea(hhea) => Statement::Hhea(hhea),
             ToplevelItem::Name(name) => Statement::Name(name),
+            ToplevelItem::Os2(os2) => Statement::Os2(os2),
             ToplevelItem::Stat(stat) => Statement::Stat(stat),
             ToplevelItem::Vhea(vhea) => Statement::Vhea(vhea),
         }
@@ -514,6 +519,7 @@ impl TryFrom<Statement> for ToplevelItem {
             Statement::Head(head) => Ok(ToplevelItem::Head(head)),
             Statement::Hhea(hhea) => Ok(ToplevelItem::Hhea(hhea)),
             Statement::Name(name) => Ok(ToplevelItem::Name(name)),
+            Statement::Os2(os2) => Ok(ToplevelItem::Os2(os2)),
             Statement::Stat(stat) => Ok(ToplevelItem::Stat(stat)),
             Statement::Vhea(vhea) => Ok(ToplevelItem::Vhea(vhea)),
             _ => Err(crate::Error::CannotConvert),
@@ -539,6 +545,7 @@ impl AsFea for ToplevelItem {
             ToplevelItem::Head(head) => head.as_fea(indent),
             ToplevelItem::Hhea(hhea) => hhea.as_fea(indent),
             ToplevelItem::Name(name) => name.as_fea(indent),
+            ToplevelItem::Os2(os2) => os2.as_fea(indent),
             ToplevelItem::Stat(stat) => stat.as_fea(indent),
             ToplevelItem::Vhea(vhea) => vhea.as_fea(indent),
         }
@@ -580,6 +587,8 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
         Some(ToplevelItem::Vhea(vhea.into()))
     } else if let Some(name) = fea_rs::typed::NameTable::cast(child) {
         Some(ToplevelItem::Name(name.into()))
+    } else if let Some(os2) = fea_rs::typed::Os2Table::cast(child) {
+        Some(ToplevelItem::Os2(os2.into()))
     } else if let Some(stat) = fea_rs::typed::StatTable::cast(child) {
         Some(ToplevelItem::Stat(stat.into()))
     } else {

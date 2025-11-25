@@ -4,8 +4,8 @@ use fea_rs::typed::{AstNode as _, Tag};
 use smol_str::SmolStr;
 
 use crate::{
-    from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, Statement, ValueRecord,
-    SHIFT,
+    Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, SHIFT, Statement, ValueRecord,
+    from_anchor,
 };
 
 /// A named anchor definition. (2.e.viii)

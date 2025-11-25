@@ -197,35 +197,36 @@ impl From<fea_rs::typed::StatTable> for Table<Stat> {
 // hhea
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum HheaFieldType {
-    CaretOffset,
-    Ascender,
-    Descender,
-    LineGap,
+pub enum HheaField {
+    Comment(Comment),
+    CaretOffset(i16),
+    Ascender(i16),
+    Descender(i16),
+    LineGap(i16),
 }
-impl AsFea for HheaFieldType {
-    fn as_fea(&self, _indent: &str) -> String {
+impl AsFea for HheaField {
+    fn as_fea(&self, indent: &str) -> String {
         match self {
-            HheaFieldType::CaretOffset => "CaretOffset".to_string(),
-            HheaFieldType::Ascender => "Ascender".to_string(),
-            HheaFieldType::Descender => "Descender".to_string(),
-            HheaFieldType::LineGap => "LineGap".to_string(),
+            HheaField::Comment(cmt) => cmt.as_fea(indent),
+            HheaField::CaretOffset(x) => format!("{}CaretOffset {};", indent, x),
+            HheaField::Ascender(x) => format!("{}Ascender {};", indent, x),
+            HheaField::Descender(x) => format!("{}Descender {};", indent, x),
+            HheaField::LineGap(x) => format!("{}LineGap {};", indent, x),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HheaField {
-    field_type: HheaFieldType,
-    value: i16,
+pub struct HheaStatement {
+    field: HheaField,
     location: Range<usize>,
 }
-impl AsFea for HheaField {
+impl AsFea for HheaStatement {
     fn as_fea(&self, indent: &str) -> String {
-        format!("{}{} {};", indent, self.field_type.as_fea(""), self.value)
+        self.field.as_fea(indent)
     }
 }
-impl From<fea_rs::typed::MetricRecord> for HheaField {
+impl From<fea_rs::typed::MetricRecord> for HheaStatement {
     fn from(val: fea_rs::typed::MetricRecord) -> Self {
         let keyword = val
             .node()
@@ -242,15 +243,14 @@ impl From<fea_rs::typed::MetricRecord> for HheaField {
             fea_rs::typed::Metric::Scalar(number) => number.text().parse::<i16>().unwrap(),
             _ => unimplemented!(),
         };
-        HheaField {
-            field_type: match keyword.kind {
-                fea_rs::Kind::CaretOffsetKw => HheaFieldType::CaretOffset,
-                fea_rs::Kind::AscenderKw => HheaFieldType::Ascender,
-                fea_rs::Kind::DescenderKw => HheaFieldType::Descender,
-                fea_rs::Kind::LineGapKw => HheaFieldType::LineGap,
+        HheaStatement {
+            field: match keyword.kind {
+                fea_rs::Kind::CaretOffsetKw => HheaField::CaretOffset(value),
+                fea_rs::Kind::AscenderKw => HheaField::Ascender(value),
+                fea_rs::Kind::DescenderKw => HheaField::Descender(value),
+                fea_rs::Kind::LineGapKw => HheaField::LineGap(value),
                 _ => panic!("Unexpected keyword in HHEA metric record"),
             },
-            value,
             location: val.range(),
         }
     }
@@ -267,13 +267,17 @@ impl From<fea_rs::typed::HheaTable> for Table<Hhea> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hhea;
 impl FeaTable for Hhea {
-    type Statement = HheaField;
+    type Statement = HheaStatement;
     const TAG: &'static str = "hhea";
     type FeaRsTable = fea_rs::typed::HheaTable;
     #[allow(clippy::manual_map)]
-    fn to_statement(child: &NodeOrToken) -> Option<HheaField> {
-        // Damn the comments.
-        if let Some(fr) = fea_rs::typed::MetricRecord::cast(child) {
+    fn to_statement(child: &NodeOrToken) -> Option<HheaStatement> {
+        if child.kind() == fea_rs::Kind::Comment {
+            Some(HheaStatement {
+                field: HheaField::Comment(Comment::from(child.token_text().unwrap())),
+                location: child.range(),
+            })
+        } else if let Some(fr) = fea_rs::typed::MetricRecord::cast(child) {
             Some(fr.into())
         } else {
             None
@@ -284,33 +288,34 @@ impl FeaTable for Hhea {
 // vhea
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VheaFieldType {
-    VertTypoAscender,
-    VertTypoDescender,
-    VertTypoLineGap,
+pub enum VheaField {
+    Comment(Comment),
+    VertTypoAscender(i16),
+    VertTypoDescender(i16),
+    VertTypoLineGap(i16),
 }
-impl AsFea for VheaFieldType {
-    fn as_fea(&self, _indent: &str) -> String {
+impl AsFea for VheaField {
+    fn as_fea(&self, indent: &str) -> String {
         match self {
-            VheaFieldType::VertTypoAscender => "VertTypoAscender".to_string(),
-            VheaFieldType::VertTypoDescender => "VertTypoDescender".to_string(),
-            VheaFieldType::VertTypoLineGap => "VertTypoLineGap".to_string(),
+            VheaField::Comment(cmt) => cmt.as_fea(indent),
+            VheaField::VertTypoAscender(x) => format!("{}VertTypoAscender {};", indent, x),
+            VheaField::VertTypoDescender(x) => format!("{}VertTypoDescender {};", indent, x),
+            VheaField::VertTypoLineGap(x) => format!("{}VertTypoLineGap {};", indent, x),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VheaField {
-    field_type: VheaFieldType,
-    value: i16,
+pub struct VheaStatement {
+    field: VheaField,
     location: Range<usize>,
 }
-impl AsFea for VheaField {
+impl AsFea for VheaStatement {
     fn as_fea(&self, indent: &str) -> String {
-        format!("{}{} {};", indent, self.field_type.as_fea(""), self.value)
+        self.field.as_fea(indent)
     }
 }
-impl From<fea_rs::typed::MetricRecord> for VheaField {
+impl From<fea_rs::typed::MetricRecord> for VheaStatement {
     fn from(val: fea_rs::typed::MetricRecord) -> Self {
         let keyword = val
             .node()
@@ -327,14 +332,13 @@ impl From<fea_rs::typed::MetricRecord> for VheaField {
             fea_rs::typed::Metric::Scalar(number) => number.text().parse::<i16>().unwrap(),
             _ => unimplemented!(),
         };
-        VheaField {
-            field_type: match keyword.kind {
-                fea_rs::Kind::VertTypoAscenderKw => VheaFieldType::VertTypoAscender,
-                fea_rs::Kind::VertTypoDescenderKw => VheaFieldType::VertTypoDescender,
-                fea_rs::Kind::VertTypoLineGapKw => VheaFieldType::VertTypoLineGap,
+        VheaStatement {
+            field: match keyword.kind {
+                fea_rs::Kind::VertTypoAscenderKw => VheaField::VertTypoAscender(value),
+                fea_rs::Kind::VertTypoDescenderKw => VheaField::VertTypoDescender(value),
+                fea_rs::Kind::VertTypoLineGapKw => VheaField::VertTypoLineGap(value),
                 _ => panic!("Unexpected keyword in Vhea metric record"),
             },
-            value,
             location: val.range(),
         }
     }
@@ -351,13 +355,17 @@ impl From<fea_rs::typed::VheaTable> for Table<Vhea> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Vhea;
 impl FeaTable for Vhea {
-    type Statement = VheaField;
+    type Statement = VheaStatement;
     const TAG: &'static str = "vhea";
     type FeaRsTable = fea_rs::typed::VheaTable;
     #[allow(clippy::manual_map)]
-    fn to_statement(child: &NodeOrToken) -> Option<VheaField> {
-        // Damn the comments.
-        if let Some(fr) = fea_rs::typed::MetricRecord::cast(child) {
+    fn to_statement(child: &NodeOrToken) -> Option<VheaStatement> {
+        if child.kind() == fea_rs::Kind::Comment {
+            Some(VheaStatement {
+                field: VheaField::Comment(Comment::from(child.token_text().unwrap())),
+                location: child.range(),
+            })
+        } else if let Some(fr) = fea_rs::typed::MetricRecord::cast(child) {
             Some(fr.into())
         } else {
             None

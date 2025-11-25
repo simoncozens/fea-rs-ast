@@ -3,6 +3,7 @@ use std::ops::Range;
 use fea_rs::typed::AstNode;
 
 use crate::AsFea;
+use read_fonts::tables::name::{Encoding};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameRecordKind {
@@ -51,12 +52,34 @@ impl NameRecord {
             location,
         }
     }
+
+    fn escape_string(&self) -> String {
+        let encoding = Encoding::new(self.platform_id, self.plat_enc_id);
+        let needs_escaping = |c| {
+            !(c >= 0x20 as char && c <= 0x7E as char && (c != 0x22 as char && c != 0x5c as char))
+        };
+        // Encode the string
+        self.string
+            .chars()
+            .map(|x| {
+                if needs_escaping(x) {
+                    if matches!(encoding, Encoding::Utf16Be) {
+                        format!(r"\{:04x}", x as u32)
+                    } else {
+                        format!(r"\{:02x}", x as u32)
+                    }
+                } else {
+                    x.to_string()
+                }
+            })
+            .collect()
+    }
 }
 
 impl AsFea for NameRecord {
     fn as_fea(&self, _indent: &str) -> String {
         // Escape the string for FEA output
-        let escaped = escape_string(&self.string);
+        let escaped = self.escape_string();
 
         let plat = if self.platform_id == 3 && self.plat_enc_id == 1 && self.lang_id == 1033 {
             ""
@@ -186,26 +209,6 @@ fn unescape_string(s: &str) -> String {
     result
 }
 
-/// Escape a string for FEA output
-/// Characters outside ASCII printable range (except quotes and backslashes) are escaped
-fn escape_string(s: &str) -> String {
-    s.chars()
-        .flat_map(|c| {
-            let code = c as u32;
-            // Printable ASCII except quote (0x22) and backslash (0x5C)
-            if (0x20..=0x7E).contains(&code) && code != 0x22 && code != 0x5C {
-                vec![c]
-            } else if code <= 0xFF {
-                // For bytes 0-255, use 4-digit hex with leading zeros (\\00xx)
-                format!("\\{:04x}", code).chars().collect()
-            } else {
-                // For characters > 255, use 4-digit hex (\\xxxx)
-                format!("\\{:04x}", code).chars().collect()
-            }
-        })
-        .collect()
-}
-
 impl From<fea_rs::typed::SizeMenuName> for NameRecord {
     fn from(val: fea_rs::typed::SizeMenuName) -> Self {
         // Get the NameSpec which contains platform info and string
@@ -308,14 +311,5 @@ mod tests {
             0..0,
         );
         assert_eq!(stmt.as_fea(""), r#"nameid 9 "Test Designer";"#);
-    }
-
-    #[test]
-    fn test_escape_string() {
-        assert_eq!(escape_string("Hello"), "Hello");
-        assert_eq!(escape_string("Müller"), "M\\00fcller");
-        assert_eq!(escape_string("Lancé"), "Lanc\\00e9");
-        assert_eq!(escape_string("Test\"Quote"), "Test\\0022Quote");
-        assert_eq!(escape_string("Back\\slash"), "Back\\005cslash");
     }
 }

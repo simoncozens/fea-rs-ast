@@ -99,7 +99,7 @@ impl<T: SubOrPos> ChainedContextStatement<T> {
     }
 }
 
-impl<T:SubOrPos> PotentiallyContextualStatement for ChainedContextStatement<T> {
+impl<T: SubOrPos> PotentiallyContextualStatement for ChainedContextStatement<T> {
     fn is_contextual(&self) -> bool {
         true
     }
@@ -288,7 +288,7 @@ impl From<fea_rs::typed::Gpos8> for Statement {
                 .iter_children()
                 .find_map(fea_rs::typed::ValueRecord::cast);
             if let Some(goc) = glyph {
-                context_glyphs.push((goc.into(), value_record_node.map(|vr|vr.into())));
+                context_glyphs.push((goc.into(), value_record_node.map(|vr| vr.into())));
             }
         }
         Statement::SinglePos(crate::gpos::SinglePosStatement::new(
