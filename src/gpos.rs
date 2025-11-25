@@ -1,13 +1,13 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
 use crate::{
-    Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement, ValueRecord,
-    from_anchor,
+    from_anchor, Anchor, AsFea, GlyphContainer, MarkClass, PotentiallyContextualStatement,
+    ValueRecord,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -520,7 +520,7 @@ mod tests {
             vec![(
                 GlyphContainer::GlyphName(GlyphName::new("A")),
                 Some(ValueRecord {
-                    x_advance: Some(50),
+                    x_advance: Some(50.into()),
                     y_advance: None,
                     x_placement: None,
                     y_placement: None,
@@ -565,7 +565,7 @@ mod tests {
             GlyphContainer::GlyphName(GlyphName::new("A")),
             GlyphContainer::GlyphName(GlyphName::new("B")),
             ValueRecord {
-                x_advance: Some(50),
+                x_advance: Some(50.into()),
                 y_advance: None,
                 x_placement: None,
                 y_placement: None,
@@ -577,7 +577,7 @@ mod tests {
                 location: 0..0,
             },
             Some(ValueRecord {
-                x_advance: Some(30),
+                x_advance: Some(30.into()),
                 y_advance: None,
                 x_placement: None,
                 y_placement: None,

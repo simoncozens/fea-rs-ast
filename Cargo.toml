@@ -9,6 +9,10 @@ fea-rs = { git = "https://github.com/googlefonts/fontc.git" }
 log = "0.4.28"
 smol_str = "0.3.4"
 thiserror = "2.0.17"
+read-fonts = "0.36.0"
+itertools = "0.14.0"
+indexmap = "2.12.1"
+
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 rstest = "0.26.1"

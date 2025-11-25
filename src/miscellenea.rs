@@ -4,23 +4,23 @@ use fea_rs::typed::{AstNode as _, Tag};
 use smol_str::SmolStr;
 
 use crate::{
-    Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, SHIFT, Statement, ValueRecord,
-    from_anchor,
+    from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, Metric, Statement,
+    ValueRecord, SHIFT,
 };
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchorDefinition {
-    pub x: i16,
-    pub y: i16,
+    pub x: Metric,
+    pub y: Metric,
     pub contourpoint: Option<u16>,
     pub name: String,
     pub location: Range<usize>,
 }
 impl AnchorDefinition {
     pub fn new(
-        x: i16,
-        y: i16,
+        x: Metric,
+        y: Metric,
         contourpoint: Option<u16>,
         name: String,
         location: Range<usize>,
@@ -36,7 +36,7 @@ impl AnchorDefinition {
 }
 impl AsFea for AnchorDefinition {
     fn as_fea(&self, _indent: &str) -> String {
-        let mut res = format!("anchorDef {} {}", self.x, self.y);
+        let mut res = format!("anchorDef {} {}", self.x.as_fea(""), self.y.as_fea(""));
         if let Some(cp) = self.contourpoint {
             res.push_str(&format!(" contourpoint {}", cp));
         }
@@ -941,8 +941,8 @@ mod tests {
             .find_map(fea_rs::typed::AnchorDef::cast)
             .unwrap();
         let stmt = AnchorDefinition::from(anchor_def);
-        assert_eq!(stmt.x, 300);
-        assert_eq!(stmt.y, 100);
+        assert_eq!(stmt.x, 300.into());
+        assert_eq!(stmt.y, 100.into());
         assert_eq!(stmt.name, "ANCHOR_1");
         assert_eq!(stmt.contourpoint, None);
         assert_eq!(stmt.as_fea(""), "anchorDef 300 100 ANCHOR_1;");
@@ -958,8 +958,8 @@ mod tests {
             .find_map(fea_rs::typed::AnchorDef::cast)
             .unwrap();
         let stmt = AnchorDefinition::from(anchor_def);
-        assert_eq!(stmt.x, 300);
-        assert_eq!(stmt.y, 100);
+        assert_eq!(stmt.x, 300.into());
+        assert_eq!(stmt.y, 100.into());
         assert_eq!(stmt.contourpoint, Some(5));
         assert_eq!(stmt.name, "ANCHOR_1");
         assert_eq!(
@@ -970,7 +970,7 @@ mod tests {
 
     #[test]
     fn test_generation_anchordef() {
-        let stmt = AnchorDefinition::new(150, -50, None, "BASE".to_string(), 0..0);
+        let stmt = AnchorDefinition::new(150.into(), (-50).into(), None, "BASE".to_string(), 0..0);
         assert_eq!(stmt.as_fea(""), "anchorDef 150 -50 BASE;");
     }
 

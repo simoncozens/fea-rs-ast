@@ -1,4 +1,4 @@
-use std::{fmt::format, ops::Range};
+use std::ops::Range;
 
 use fea_rs::{
     typed::{AstNode as _, Number, Os2TableItem},

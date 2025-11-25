@@ -1,20 +1,115 @@
 use std::ops::Range;
 
 use fea_rs::{
+    typed::{AstNode as _, LocationSpec, LocationValue, Number},
     Kind,
-    typed::{AstNode as _, Metric},
 };
+use indexmap::IndexMap;
 use smol_str::SmolStr;
 
 use crate::AsFea;
 
+/// A metric, which is potentially variable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Metric {
+    Scalar(i16),
+    Variable(Vec<(IndexMap<SmolStr, i16>, i16)>),
+}
+impl From<i16> for Metric {
+    fn from(val: i16) -> Self {
+        Metric::Scalar(val)
+    }
+}
+impl std::hash::Hash for Metric {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Metric::Scalar(val) => {
+                state.write_i16(*val);
+            }
+            Metric::Variable(variations) => {
+                for (location, value) in variations {
+                    for (tag, coord) in location {
+                        state.write(tag.as_bytes());
+                        state.write_i16(*coord);
+                    }
+                    state.write_i16(*value);
+                }
+            }
+        }
+    }
+}
+impl From<fea_rs::typed::Metric> for Metric {
+    fn from(val: fea_rs::typed::Metric) -> Self {
+        match val {
+            fea_rs::typed::Metric::Scalar(number) => {
+                Metric::Scalar(number.token().text.parse::<i16>().unwrap())
+            }
+            fea_rs::typed::Metric::Variable(variable_metric) => {
+                let location_values = variable_metric.iter().filter_map(LocationValue::cast);
+                let mut variations = Vec::new();
+                for location_value in location_values {
+                    let location = location_value.iter().find_map(LocationSpec::cast).unwrap();
+                    let value = location_value.iter().find_map(Number::cast).unwrap();
+                    variations.push((
+                        from_locationspec(&location),
+                        value.token().text.parse::<i16>().unwrap(),
+                    ));
+                }
+                Metric::Variable(variations)
+            }
+            fea_rs::typed::Metric::GlyphsAppNumber(glyphs_app_number) => todo!(),
+        }
+    }
+}
+fn from_locationspec(val: &fea_rs::typed::LocationSpec) -> IndexMap<SmolStr, i16> {
+    let mut map = IndexMap::new();
+    for item in val.iter().filter_map(fea_rs::typed::LocationSpecItem::cast) {
+        let axis_tag = item.iter().find_map(fea_rs::typed::Tag::cast).unwrap();
+        let axislocation = item
+            .iter()
+            .skip(2)
+            .find_map(fea_rs::typed::AxisLocation::cast)
+            .unwrap();
+        let raw = axislocation.iter().next().unwrap();
+        let value = Number::cast(raw)
+            .map(|num| num.text().parse::<f64>().unwrap())
+            .unwrap();
+        map.insert(axis_tag.token().as_str().into(), value as i16);
+    }
+    map
+}
+
+impl AsFea for Metric {
+    fn as_fea(&self, _indent: &str) -> String {
+        match self {
+            Metric::Scalar(val) => format!("{}", val),
+            Metric::Variable(variations) => {
+                let mut res = String::from("(");
+                for (i, (location, value)) in variations.iter().enumerate() {
+                    if i > 0 {
+                        res.push_str(" ");
+                    }
+                    let loc_str = location
+                        .iter()
+                        .map(|(tag, coord)| format!("{}={}", tag, coord))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    res.push_str(&format!("{}:{}", loc_str, value));
+                }
+                res.push(')');
+                res
+            }
+        }
+    }
+}
+
 type DeviceTable = Vec<(u8, i8)>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecord {
-    pub x_placement: Option<i16>,
-    pub y_placement: Option<i16>,
-    pub x_advance: Option<i16>,
-    pub y_advance: Option<i16>,
+    pub x_placement: Option<Metric>,
+    pub y_placement: Option<Metric>,
+    pub x_advance: Option<Metric>,
+    pub y_advance: Option<Metric>,
     pub x_placement_device: Option<DeviceTable>,
     pub y_placement_device: Option<DeviceTable>,
     pub x_advance_device: Option<DeviceTable>,
@@ -39,10 +134,10 @@ fn device_to_string(device: &Option<DeviceTable>) -> String {
 impl ValueRecord {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        x_placement: Option<i16>,
-        y_placement: Option<i16>,
-        x_advance: Option<i16>,
-        y_advance: Option<i16>,
+        x_placement: Option<Metric>,
+        y_placement: Option<Metric>,
+        x_advance: Option<Metric>,
+        y_advance: Option<Metric>,
         x_placement_device: Option<DeviceTable>,
         y_placement_device: Option<DeviceTable>,
         x_advance_device: Option<DeviceTable>,
@@ -80,7 +175,7 @@ impl ValueRecord {
                 None,
                 None,
                 None,
-                Some(advance),
+                Some(advance.into()),
                 None,
                 None,
                 None,
@@ -92,7 +187,7 @@ impl ValueRecord {
             Self::new(
                 None,
                 None,
-                Some(advance),
+                Some(advance.into()),
                 None,
                 None,
                 None,
@@ -113,10 +208,10 @@ impl ValueRecord {
         location: Range<usize>,
     ) -> Self {
         Self::new(
-            Some(x_placement),
-            Some(y_placement),
-            Some(x_advance),
-            Some(y_advance),
+            Some(x_placement.into()),
+            Some(y_placement.into()),
+            Some(x_advance.into()),
+            Some(y_advance.into()),
             None,
             None,
             None,
@@ -132,40 +227,47 @@ impl AsFea for ValueRecord {
         if !self.is_some() {
             return "<NULL>".to_string();
         }
-        let (x, y) = (self.x_placement, self.y_placement);
-        let (x_advance, y_advance) = (self.x_advance, self.y_advance);
+        let (x, y) = (&self.x_placement, &self.y_placement);
+        let (x_advance, y_advance) = (&self.x_advance, &self.y_advance);
         let (x_pla_device, y_pla_device) = (&self.x_placement_device, &self.y_placement_device);
         let (x_adv_device, y_adv_device) = (&self.x_advance_device, &self.y_advance_device);
         let vertical = self.vertical;
         // Try format A, if possible.
         if x.is_none() && y.is_none() {
             if x_advance.is_none() && vertical {
-                return format!("{}", y_advance.unwrap());
+                return y_advance.as_ref().unwrap().as_fea("");
             } else if y_advance.is_none() && !vertical {
-                return format!("{}", x_advance.unwrap());
+                return x_advance.as_ref().unwrap().as_fea("");
             }
         }
         // Make any remaining None value 0 to avoid generating invalid records.
-        let x = x.unwrap_or(0);
-        let y = y.unwrap_or(0);
-        let x_advance = x_advance.unwrap_or(0);
-        let y_advance = y_advance.unwrap_or(0);
+        let zero: Metric = 0.into();
+        let x = x.as_ref().unwrap_or(&zero);
+        let y = y.as_ref().unwrap_or(&zero);
+        let x_advance = x_advance.as_ref().unwrap_or(&zero);
+        let y_advance = y_advance.as_ref().unwrap_or(&zero);
         // Try format B, if possible.
         if x_pla_device.is_none()
             && y_pla_device.is_none()
             && x_adv_device.is_none()
             && y_adv_device.is_none()
         {
-            return format!("<{} {} {} {}>", x, y, x_advance, y_advance);
+            return format!(
+                "<{} {} {} {}>",
+                x.as_fea(""),
+                y.as_fea(""),
+                x_advance.as_fea(""),
+                y_advance.as_fea("")
+            );
         }
 
         // Last resort is format C.
         format!(
             "<{} {} {} {} {} {} {} {}>",
-            x,
-            y,
-            x_advance,
-            y_advance,
+            x.as_fea(""),
+            y.as_fea(""),
+            x_advance.as_fea(""),
+            y_advance.as_fea(""),
             device_to_string(x_pla_device),
             device_to_string(y_pla_device),
             device_to_string(x_adv_device),
@@ -192,34 +294,48 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
             );
         }
         // Count the integer values
-        let numbers = val
+        let mut numbers = val
             .iter()
-            .filter(|t| t.kind() == Kind::Number)
+            .filter_map(fea_rs::typed::Metric::cast)
             .collect::<Vec<_>>();
         if numbers.len() == 1 {
             // Format A, just an advance
-            let advance = numbers[0].token_text().unwrap().parse::<i16>().unwrap();
-            return Self::new_format_a(advance, false, val.node().range());
+            return Self {
+                x_placement: None,
+                y_placement: None,
+                x_advance: Some(numbers.remove(0).into()),
+                y_advance: None,
+                x_placement_device: None,
+                y_placement_device: None,
+                x_advance_device: None,
+                y_advance_device: None,
+                vertical: false,
+                location: val.node().range(),
+            };
         } else if numbers.len() == 4 {
             // Format B or C - ignore format C for now
-            let x_placement = numbers[0].token_text().unwrap().parse::<i16>().unwrap();
-            let y_placement = numbers[1].token_text().unwrap().parse::<i16>().unwrap();
-            let x_advance = numbers[2].token_text().unwrap().parse::<i16>().unwrap();
-            let y_advance = numbers[3].token_text().unwrap().parse::<i16>().unwrap();
+            let x_placement: Metric = numbers.remove(0).into();
+            let y_placement: Metric = numbers.remove(0).into();
+            let x_advance: Metric = numbers.remove(0).into();
+            let y_advance: Metric = numbers.remove(0).into();
             let devices = val
                 .iter()
                 .filter_map(fea_rs::typed::Device::cast)
                 .flat_map(from_device)
                 .collect::<Vec<_>>();
             if devices.is_empty() {
-                return Self::new_format_b(
-                    x_placement,
-                    y_placement,
-                    x_advance,
-                    y_advance,
-                    false,
-                    val.node().range(),
-                );
+                return Self {
+                    x_placement: Some(x_placement),
+                    y_placement: Some(y_placement),
+                    x_advance: Some(x_advance),
+                    y_advance: Some(y_advance),
+                    vertical: false,
+                    location: val.node().range(),
+                    x_placement_device: None,
+                    y_placement_device: None,
+                    x_advance_device: None,
+                    y_advance_device: None,
+                };
             }
             let x_pla_device = devices.first().cloned();
             let y_pla_device = devices.get(1).cloned();
@@ -256,7 +372,11 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
         }
     }
 
-    if table.is_empty() { None } else { Some(table) }
+    if table.is_empty() {
+        None
+    } else {
+        Some(table)
+    }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.
@@ -265,8 +385,8 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
 /// Other values should be integer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Anchor {
-    pub x: i16,
-    pub y: i16,
+    pub x: Metric,
+    pub y: Metric,
     pub name: Option<SmolStr>,
     pub contourpoint: Option<u16>,
     pub x_device_table: Option<DeviceTable>,
@@ -276,8 +396,8 @@ pub struct Anchor {
 
 impl Anchor {
     pub fn new(
-        x: i16,
-        y: i16,
+        x: Metric,
+        y: Metric,
         name: Option<SmolStr>,
         contourpoint: Option<u16>,
         x_device_table: Option<DeviceTable>,
@@ -297,8 +417,8 @@ impl Anchor {
 
     pub fn new_simple(x: i16, y: i16, location: Range<usize>) -> Self {
         Self {
-            x,
-            y,
+            x: x.into(),
+            y: y.into(),
             name: None,
             contourpoint: None,
             x_device_table: None,
@@ -309,8 +429,8 @@ impl Anchor {
 
     pub fn new_named(name: SmolStr, location: Range<usize>) -> Self {
         Self {
-            x: 0,
-            y: 0,
+            x: 0.into(),
+            y: 0.into(),
             name: Some(name),
             contourpoint: None,
             x_device_table: None,
@@ -325,7 +445,7 @@ impl AsFea for Anchor {
         if let Some(name) = &self.name {
             return format!("<anchor {}>", name);
         }
-        let mut res = format!("<anchor {} {}", self.x, self.y);
+        let mut res = format!("<anchor {} {}", self.x.as_fea(""), self.y.as_fea(""));
         if let Some(contourpoint) = &self.contourpoint {
             res.push_str(&format!(" contourpoint {}", contourpoint));
         }
@@ -353,20 +473,13 @@ pub(crate) fn from_anchor(val: fea_rs::typed::Anchor) -> Option<Anchor> {
         ));
     }
     // Otherwise, extract coordinates
-    let metrics = val
+    let mut metrics: Vec<Metric> = val
         .iter()
         .filter_map(fea_rs::typed::Metric::cast)
+        .map(|m| m.into())
         .collect::<Vec<_>>();
-    let x = if let Metric::Scalar(x) = &metrics[0] {
-        x.token().text.parse::<i16>().unwrap()
-    } else {
-        panic!("Invalid Anchor format");
-    };
-    let y = if let Metric::Scalar(y) = &metrics[1] {
-        y.token().text.parse::<i16>().unwrap()
-    } else {
-        panic!("Invalid Anchor format");
-    };
+    let x = metrics.remove(0);
+    let y = metrics.remove(0);
     let contourpoint = val
         .iter()
         .skip_while(|x| x.kind() != Kind::ContourpointKw)
@@ -397,10 +510,10 @@ mod tests {
     #[test]
     fn test_valuerecord_asfea() {
         let val = ValueRecord::new(
-            Some(1),
-            Some(2),
-            Some(3),
-            Some(4),
+            Some(1.into()),
+            Some(2.into()),
+            Some(3.into()),
+            Some(4.into()),
             None,
             None,
             None,
