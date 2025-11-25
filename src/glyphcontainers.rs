@@ -197,7 +197,7 @@ impl From<fea_rs::typed::GlyphOrClass> for GlyphContainer {
             GlyphOrClass::Class(glyph_class_literal) => {
                 GlyphContainer::GlyphClass(glyph_class_literal.into())
             }
-            GlyphOrClass::Cid(cid) => todo!(),
+            GlyphOrClass::Cid(_cid) => todo!(),
             GlyphOrClass::NamedClass(glyph_class_name) => {
                 GlyphContainer::GlyphClassName(SmolStr::new(glyph_class_name.text()))
             }
@@ -229,6 +229,13 @@ impl GlyphContainer {
             members,
             0..0, // location is not relevant here
         ))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            GlyphContainer::GlyphClass(gcs) => gcs.glyphs.is_empty(),
+            _ => false,
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, Metric},
+    Kind,
 };
 use smol_str::SmolStr;
 
@@ -221,7 +221,7 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
                     val.node().range(),
                 );
             }
-            let x_pla_device = devices.get(0).cloned();
+            let x_pla_device = devices.first().cloned();
             let y_pla_device = devices.get(1).cloned();
             let x_adv_device = devices.get(2).cloned();
             let y_adv_device = devices.get(3).cloned();
@@ -256,7 +256,11 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
         }
     }
 
-    if table.is_empty() { None } else { Some(table) }
+    if table.is_empty() {
+        None
+    } else {
+        Some(table)
+    }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.

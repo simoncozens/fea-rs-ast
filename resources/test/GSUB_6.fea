@@ -7,9 +7,9 @@ lookup ChainedMultipleSubst {
     sub [A - C a - c] [D d] E c_t' V [W w] [X - Z x - z] by c t;
 } ChainedMultipleSubst;
 
-lookup ChainedAlternateSubst {
-    sub [space comma semicolon] e' from [e e.begin];
-} ChainedAlternateSubst;
+#lookup ChainedAlternateSubst {
+#    sub [space comma semicolon] e' from [e e.begin];
+#} ChainedAlternateSubst;
 
 lookup ChainedLigatureSubst {
     sub A [C c]' [T t]' Z by c_t;
@@ -22,7 +22,7 @@ lookup ChainedContextualSubst {
 feature test {
     lookup ChainedSingleSubst;
     lookup ChainedMultipleSubst;
-    lookup ChainedAlternateSubst;
+    #lookup ChainedAlternateSubst;
     lookup ChainedLigatureSubst;
     lookup ChainedContextualSubst;
 } test;

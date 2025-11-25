@@ -1,8 +1,12 @@
 use std::ops::Range;
 
 use fea_rs::typed::{AstNode as _, Tag};
+use smol_str::SmolStr;
 
-use crate::{from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass};
+use crate::{
+    from_anchor, Anchor, AsFea, GlyphClass, GlyphContainer, MarkClass, Statement, ValueRecord,
+    SHIFT,
+};
 
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -451,6 +455,208 @@ impl From<fea_rs::typed::Parameters> for SizeParameters {
     }
 }
 
+/// A variable layout conditionset.
+///
+/// Example:
+/// ```fea
+/// conditionset heavy {
+///     wght 700 900;
+/// } heavy;
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConditionSet {
+    /// The name of this conditionset
+    pub name: String,
+    /// A map of axis tags to (min, max) userspace coordinates
+    pub conditions: Vec<(String, f32, f32)>,
+    /// Location in the source FEA file
+    pub location: Range<usize>,
+}
+impl Eq for ConditionSet {}
+
+impl ConditionSet {
+    pub fn new(name: String, conditions: Vec<(String, f32, f32)>, location: Range<usize>) -> Self {
+        Self {
+            name,
+            conditions,
+            location,
+        }
+    }
+}
+
+impl From<fea_rs::typed::ConditionSet> for ConditionSet {
+    fn from(val: fea_rs::typed::ConditionSet) -> Self {
+        // Extract the label (name)
+        let name = val
+            .iter()
+            .find_map(|t| {
+                if t.kind() == fea_rs::Kind::Label {
+                    t.as_token().map(|tok| tok.text.to_string())
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
+        // Helper to parse numbers as f32
+        let parse_number =
+            |n: fea_rs::typed::Number| -> f32 { n.text().parse::<i16>().unwrap() as f32 };
+
+        // Extract conditions
+        let conditions: Vec<(String, f32, f32)> = val
+            .iter()
+            .filter_map(fea_rs::typed::Condition::cast)
+            .map(|cond| {
+                // Get tag
+                let tag = cond
+                    .iter()
+                    .find_map(fea_rs::typed::Tag::cast)
+                    .unwrap()
+                    .text()
+                    .to_string();
+
+                // Get min and max values
+                let mut numbers = cond.iter().filter_map(fea_rs::typed::Number::cast);
+                let min = parse_number(numbers.next().unwrap());
+                let max = parse_number(numbers.next().unwrap());
+
+                (tag, min, max)
+            })
+            .collect();
+
+        Self::new(name, conditions, val.node().range())
+    }
+}
+
+impl AsFea for ConditionSet {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = format!("{}conditionset {} {{\n", indent, self.name);
+        for (tag, min, max) in &self.conditions {
+            // Format numbers nicely - remove trailing zeros and decimal point if integer
+            let format_num = |n: &f32| {
+                let s = format!("{}", n);
+                if s.contains('.') {
+                    s.trim_end_matches('0').trim_end_matches('.').to_string()
+                } else {
+                    s
+                }
+            };
+            res.push_str(&format!(
+                "{}\t{} {} {};\n",
+                indent,
+                tag,
+                format_num(min),
+                format_num(max)
+            ));
+        }
+        res.push_str(&format!("{}}}", indent));
+        res.push_str(&format!(" {};\n", self.name));
+        res
+    }
+}
+
+/// A variable layout variation block.
+///
+/// Example:
+/// ```fea
+/// variation rvrn heavy {
+///     lookup symbols_heavy;
+/// } rvrn;
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariationBlock {
+    /// The feature tag for this variation
+    pub name: SmolStr,
+    /// The name of the conditionset this variation applies to
+    pub conditionset: String,
+    /// Statements within this variation block
+    pub statements: Vec<Statement>,
+    /// Whether to use extension subtables
+    pub use_extension: bool,
+    /// Location in the source FEA file
+    pub location: Range<usize>,
+}
+
+impl VariationBlock {
+    pub fn new(
+        name: SmolStr,
+        conditionset: String,
+        statements: Vec<Statement>,
+        use_extension: bool,
+        location: Range<usize>,
+    ) -> Self {
+        Self {
+            name,
+            conditionset,
+            statements,
+            use_extension,
+            location,
+        }
+    }
+}
+
+impl From<fea_rs::typed::FeatureVariation> for VariationBlock {
+    fn from(val: fea_rs::typed::FeatureVariation) -> Self {
+        // Extract the feature tag (first tag)
+        let name = val
+            .iter()
+            .find_map(fea_rs::typed::Tag::cast)
+            .map(|tag| SmolStr::new(tag.text()))
+            .unwrap();
+
+        // Extract conditionset name - it's a label/identifier after the tag
+        let conditionset = val
+            .iter()
+            .skip_while(|t| t.kind() != fea_rs::Kind::Tag) // skip to tag
+            .skip(1) // skip the tag itself
+            .find_map(|t| {
+                if t.kind() == fea_rs::Kind::Label || t.kind() == fea_rs::Kind::Ident {
+                    t.as_token().map(|tok| tok.text.to_string())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        // Check for useExtension flag
+        let use_extension = val.iter().any(|t| t.kind() == fea_rs::Kind::UseExtensionKw);
+
+        // Parse statements within the block
+        let statements: Vec<Statement> = val
+            .node()
+            .iter_children()
+            .filter_map(crate::to_statement)
+            .collect();
+
+        Self::new(
+            name,
+            conditionset,
+            statements,
+            use_extension,
+            val.node().range(),
+        )
+    }
+}
+
+impl AsFea for VariationBlock {
+    fn as_fea(&self, indent: &str) -> String {
+        let mut res = format!("{}variation {} {}", indent, self.name, self.conditionset);
+        if self.use_extension {
+            res.push_str(" useExtension");
+        }
+        res.push_str(" {\n");
+
+        let mid_indent = indent.to_string() + SHIFT;
+        for stmt in &self.statements {
+            res.push_str(&stmt.as_fea(&mid_indent));
+            res.push('\n');
+        }
+
+        res.push_str(&format!("{}}} {};\n", indent, self.name));
+        res
+    }
+}
+
 /// A ``lookupflag`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupFlagStatement {
@@ -587,6 +793,47 @@ impl From<fea_rs::typed::MarkClassDef> for MarkClassDefinition {
             .unwrap();
         let mark_class = MarkClass::new(mark_class_node.text().trim_start_matches('@'));
         MarkClassDefinition::new(mark_class, anchor, GlyphContainer::from(glyphs_node))
+    }
+}
+
+/// Represents a named value record definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValueRecordDefinition {
+    pub name: SmolStr,
+    pub value: ValueRecord,
+    pub location: Range<usize>,
+}
+impl ValueRecordDefinition {
+    pub fn new(name: SmolStr, value: ValueRecord, location: Range<usize>) -> Self {
+        Self {
+            name,
+            value,
+            location,
+        }
+    }
+}
+
+impl AsFea for ValueRecordDefinition {
+    fn as_fea(&self, _indent: &str) -> String {
+        format!("valueRecord {} {};", self.name, self.value.as_fea(""))
+    }
+}
+
+impl From<fea_rs::typed::ValueRecordDef> for ValueRecordDefinition {
+    fn from(val: fea_rs::typed::ValueRecordDef) -> Self {
+        let name = val
+            .iter()
+            .find(|t| t.kind() == fea_rs::Kind::Ident)
+            .unwrap();
+        let value_record_node = val
+            .iter()
+            .find_map(fea_rs::typed::ValueRecord::cast)
+            .unwrap();
+        ValueRecordDefinition::new(
+            name.as_token().unwrap().text.clone(),
+            ValueRecord::from(value_record_node),
+            val.node().range(),
+        )
     }
 }
 
@@ -1047,5 +1294,184 @@ mod tests {
             stmt.as_fea(""),
             "lookupflag RightToLeft IgnoreMarks MarkAttachmentType @foo;"
         );
+    }
+
+    // ConditionSet tests
+    #[test]
+    fn test_roundtrip_conditionset_simple() {
+        const FEA: &str = r#"conditionset heavy {
+	wght 700 900;
+} heavy;"#;
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let condset = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::ConditionSet::cast)
+            .unwrap();
+        let stmt = ConditionSet::from(condset);
+        assert_eq!(stmt.name, "heavy");
+        assert_eq!(stmt.conditions.len(), 1);
+        assert_eq!(stmt.conditions[0].0, "wght");
+        assert_eq!(stmt.conditions[0].1, 700.0);
+        assert_eq!(stmt.conditions[0].2, 900.0);
+
+        let output = stmt.as_fea("");
+        assert!(output.contains("conditionset heavy"));
+        assert!(output.contains("wght 700 900"));
+    }
+
+    #[test]
+    fn test_roundtrip_conditionset_multiple_conditions() {
+        const FEA: &str = r#"conditionset complex {
+	wght 400 700;
+	wdth 75 100;
+} complex;"#;
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let condset = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::ConditionSet::cast)
+            .unwrap();
+        let stmt = ConditionSet::from(condset);
+        assert_eq!(stmt.name, "complex");
+        assert_eq!(stmt.conditions.len(), 2);
+        assert_eq!(stmt.conditions[0], ("wght".to_string(), 400.0, 700.0));
+        assert_eq!(stmt.conditions[1], ("wdth".to_string(), 75.0, 100.0));
+
+        let output = stmt.as_fea("");
+        assert!(output.contains("conditionset complex"));
+        assert!(output.contains("wght 400 700"));
+        assert!(output.contains("wdth 75 100"));
+    }
+
+    #[test]
+    fn test_roundtrip_conditionset_from_file() {
+        const FEA: &str = include_str!("../resources/test/variable_conditionset.fea");
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let condset = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::ConditionSet::cast)
+            .unwrap();
+        let stmt = ConditionSet::from(condset);
+        assert_eq!(stmt.name, "heavy");
+        assert_eq!(stmt.conditions.len(), 1);
+        assert_eq!(stmt.conditions[0], ("wght".to_string(), 700.0, 900.0));
+    }
+
+    #[test]
+    fn test_generate_conditionset() {
+        let stmt = ConditionSet::new(
+            "myCondition".to_string(),
+            vec![
+                ("wght".to_string(), 300.0, 500.0),
+                ("opsz".to_string(), 8.0, 12.0),
+            ],
+            0..0,
+        );
+
+        let output = stmt.as_fea("");
+        assert!(output.contains("conditionset myCondition"));
+        assert!(output.contains("wght 300 500"));
+        assert!(output.contains("opsz 8 12"));
+        assert!(output.contains("} myCondition;"));
+    }
+
+    #[test]
+    fn test_conditionset_integration() {
+        // Test that ConditionSet can be parsed as a top-level item
+        const FEA: &str = r#"languagesystem DFLT dflt;
+
+conditionset heavy {
+    wght 700 900;
+} heavy;"#;
+
+        let ff = crate::FeatureFile::new_from_fea(FEA, None::<&[&str]>, None::<&str>).unwrap();
+        assert_eq!(ff.statements.len(), 2);
+
+        // Check that conditionset is in the statements
+        let cs = ff
+            .statements
+            .iter()
+            .find_map(|item| {
+                if let crate::ToplevelItem::ConditionSet(cs) = item {
+                    Some(cs)
+                } else {
+                    None
+                }
+            })
+            .expect("Should have found ConditionSet");
+
+        assert_eq!(cs.name, "heavy");
+        assert_eq!(cs.conditions.len(), 1);
+        assert_eq!(cs.conditions[0], ("wght".to_string(), 700.0, 900.0));
+
+        // Test round-trip
+        let output = cs.as_fea("");
+        assert!(output.contains("conditionset heavy"));
+        assert!(output.contains("wght 700 900"));
+    }
+
+    // VariationBlock tests
+    #[test]
+    fn test_roundtrip_variationblock() {
+        const FEA: &str = include_str!("../resources/test/variable_conditionset.fea");
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let variation = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::FeatureVariation::cast)
+            .unwrap();
+        let stmt = VariationBlock::from(variation);
+
+        assert_eq!(stmt.name, "rvrn");
+        assert_eq!(stmt.conditionset, "heavy");
+        assert_eq!(stmt.statements.len(), 1);
+
+        let output = stmt.as_fea("");
+        assert!(output.contains("variation rvrn heavy"));
+        assert!(output.contains("lookup symbols_heavy"));
+    }
+
+    #[test]
+    fn test_generate_variationblock() {
+        let stmt = VariationBlock::new(
+            "rvrn".into(),
+            "myCondition".to_string(),
+            vec![crate::Statement::Comment(crate::Comment::from("# Test"))],
+            false,
+            0..0,
+        );
+
+        let output = stmt.as_fea("");
+        assert!(output.contains("variation rvrn myCondition"));
+        assert!(output.contains("# Test"));
+        assert!(output.contains("} rvrn;"));
+    }
+
+    #[test]
+    fn test_variationblock_integration() {
+        const FEA: &str = include_str!("../resources/test/variable_conditionset.fea");
+
+        let ff = crate::FeatureFile::new_from_fea(FEA, None::<&[&str]>, None::<&str>).unwrap();
+
+        // Should have: languagesystem, lookup, conditionset, variation
+        assert!(ff.statements.len() >= 4);
+
+        // Check that variation block is in the statements
+        let vb = ff
+            .statements
+            .iter()
+            .find_map(|item| {
+                if let crate::ToplevelItem::VariationBlock(vb) = item {
+                    Some(vb)
+                } else {
+                    None
+                }
+            })
+            .expect("Should have found VariationBlock");
+
+        assert_eq!(vb.name.as_str(), "rvrn");
+        assert_eq!(vb.conditionset, "heavy");
     }
 }

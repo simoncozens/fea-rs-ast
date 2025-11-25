@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+mod base;
 mod contextual;
 mod dummyresolver;
 mod error;
@@ -17,9 +18,9 @@ mod tables;
 mod values;
 mod visitor;
 pub use contextual::*;
-pub use error::CannotConvertError;
+pub use error::Error;
 pub use fea_rs;
-use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, NodeOrToken, ParseTree};
+use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, GlyphMap, NodeOrToken, ParseTree};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -27,10 +28,11 @@ pub use gsub::*;
 pub use miscellenea::*;
 pub use name::*;
 use smol_str::SmolStr;
-use stat::*;
 pub use tables::*;
 pub use values::*;
 pub use visitor::LayoutVisitor;
+
+use crate::base::Base;
 
 pub(crate) const SHIFT: &str = "    ";
 
@@ -81,7 +83,11 @@ pub enum Statement {
     SizeMenuName(NameRecord),
     Subtable(SubtableStatement),
     Script(ScriptStatement),
+    ValueRecordDefinition(ValueRecordDefinition),
+    ConditionSet(ConditionSet),
+    VariationBlock(VariationBlock),
     // Tables and blocks
+    Base(Table<Base>),
     Gdef(Table<Gdef>),
     Head(Table<Head>),
     Hhea(Table<Hhea>),
@@ -137,12 +143,16 @@ impl AsFea for Statement {
             Statement::SizeMenuName(sm) => sm.as_fea(indent),
             Statement::SizeParameters(sp) => sp.as_fea(indent),
             Statement::Subtable(st) => st.as_fea(indent),
+            Statement::ValueRecordDefinition(vrd) => vrd.as_fea(indent),
+            Statement::ConditionSet(cs) => cs.as_fea(indent),
+            Statement::VariationBlock(vb) => vb.as_fea(indent),
             // GDEF-related statements
             Statement::GdefAttach(at) => at.as_fea(indent),
             Statement::GdefClassDef(gcd) => gcd.as_fea(indent),
             Statement::GdefLigatureCaretByIndex(lc) => lc.as_fea(indent),
             Statement::GdefLigatureCaretByPos(lc) => lc.as_fea(indent),
             // Tables and blocks
+            Statement::Base(base) => base.as_fea(indent),
             Statement::Gdef(gdef) => gdef.as_fea(indent),
             Statement::Head(head) => head.as_fea(indent),
             Statement::Hhea(hhea) => hhea.as_fea(indent),
@@ -243,7 +253,12 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
     // Doesn't exist in fea_rs AST!
     // } else if let Some(subtable) = fea_rs::typed::Subtable::cast(child) {
     //     Some(Statement::Subtable(SubtableStatement::new()))
-
+    } else if let Some(vrd) = fea_rs::typed::ValueRecordDef::cast(child) {
+        Some(Statement::ValueRecordDefinition(vrd.into()))
+    } else if let Some(cs) = fea_rs::typed::ConditionSet::cast(child) {
+        Some(Statement::ConditionSet(cs.into()))
+    } else if let Some(fv) = fea_rs::typed::FeatureVariation::cast(child) {
+        Some(Statement::VariationBlock(fv.into()))
     // Lookup blocks can exist within features
     } else if let Some(lookup) = fea_rs::typed::LookupBlock::cast(child) {
         Some(Statement::LookupBlock(lookup.into()))
@@ -443,7 +458,11 @@ pub enum ToplevelItem {
     Lookup(LookupBlock),
     Comment(Comment),
     AnchorDefinition(AnchorDefinition),
+    ValueRecordDefinition(ValueRecordDefinition),
+    ConditionSet(ConditionSet),
+    VariationBlock(VariationBlock),
     // Tables
+    Base(Table<Base>),
     Gdef(Table<Gdef>),
     Head(Table<Head>),
     Hhea(Table<Hhea>),
@@ -462,17 +481,21 @@ impl From<ToplevelItem> for Statement {
             ToplevelItem::Lookup(lb) => Statement::LookupBlock(lb),
             ToplevelItem::Comment(cmt) => Statement::Comment(cmt),
             ToplevelItem::AnchorDefinition(ad) => Statement::AnchorDefinition(ad),
-            ToplevelItem::Name(name) => Statement::Name(name),
-            ToplevelItem::Stat(stat) => Statement::Stat(stat),
+            ToplevelItem::ValueRecordDefinition(vrd) => Statement::ValueRecordDefinition(vrd),
+            ToplevelItem::ConditionSet(cs) => Statement::ConditionSet(cs),
+            ToplevelItem::VariationBlock(vb) => Statement::VariationBlock(vb),
+            ToplevelItem::Base(base) => Statement::Base(base),
             ToplevelItem::Gdef(gdef) => Statement::Gdef(gdef),
             ToplevelItem::Head(head) => Statement::Head(head),
             ToplevelItem::Hhea(hhea) => Statement::Hhea(hhea),
+            ToplevelItem::Name(name) => Statement::Name(name),
+            ToplevelItem::Stat(stat) => Statement::Stat(stat),
             ToplevelItem::Vhea(vhea) => Statement::Vhea(vhea),
         }
     }
 }
 impl TryFrom<Statement> for ToplevelItem {
-    type Error = CannotConvertError;
+    type Error = crate::Error;
 
     fn try_from(value: Statement) -> Result<Self, Self::Error> {
         match value {
@@ -483,13 +506,17 @@ impl TryFrom<Statement> for ToplevelItem {
             Statement::LookupBlock(lb) => Ok(ToplevelItem::Lookup(lb)),
             Statement::Comment(cmt) => Ok(ToplevelItem::Comment(cmt)),
             Statement::AnchorDefinition(ad) => Ok(ToplevelItem::AnchorDefinition(ad)),
+            Statement::ValueRecordDefinition(vrd) => Ok(ToplevelItem::ValueRecordDefinition(vrd)),
+            Statement::ConditionSet(cs) => Ok(ToplevelItem::ConditionSet(cs)),
+            Statement::VariationBlock(vb) => Ok(ToplevelItem::VariationBlock(vb)),
+            Statement::Base(base) => Ok(ToplevelItem::Base(base)),
             Statement::Gdef(gdef) => Ok(ToplevelItem::Gdef(gdef)),
-            Statement::Name(name) => Ok(ToplevelItem::Name(name)),
-            Statement::Stat(stat) => Ok(ToplevelItem::Stat(stat)),
             Statement::Head(head) => Ok(ToplevelItem::Head(head)),
             Statement::Hhea(hhea) => Ok(ToplevelItem::Hhea(hhea)),
+            Statement::Name(name) => Ok(ToplevelItem::Name(name)),
+            Statement::Stat(stat) => Ok(ToplevelItem::Stat(stat)),
             Statement::Vhea(vhea) => Ok(ToplevelItem::Vhea(vhea)),
-            _ => Err(CannotConvertError),
+            _ => Err(crate::Error::CannotConvert),
         }
     }
 }
@@ -504,11 +531,15 @@ impl AsFea for ToplevelItem {
             ToplevelItem::Lookup(lb) => lb.as_fea(indent),
             ToplevelItem::Comment(cmt) => cmt.as_fea(indent),
             ToplevelItem::AnchorDefinition(ad) => ad.as_fea(indent),
+            ToplevelItem::ValueRecordDefinition(vrd) => vrd.as_fea(indent),
+            ToplevelItem::ConditionSet(cs) => cs.as_fea(indent),
+            ToplevelItem::VariationBlock(vb) => vb.as_fea(indent),
+            ToplevelItem::Base(base) => base.as_fea(indent),
             ToplevelItem::Gdef(gdef) => gdef.as_fea(indent),
-            ToplevelItem::Name(name) => name.as_fea(indent),
-            ToplevelItem::Stat(stat) => stat.as_fea(indent),
             ToplevelItem::Head(head) => head.as_fea(indent),
             ToplevelItem::Hhea(hhea) => hhea.as_fea(indent),
+            ToplevelItem::Name(name) => name.as_fea(indent),
+            ToplevelItem::Stat(stat) => stat.as_fea(indent),
             ToplevelItem::Vhea(vhea) => vhea.as_fea(indent),
         }
     }
@@ -531,6 +562,14 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
         Some(ToplevelItem::Lookup(lookup.into()))
     } else if let Some(ad) = fea_rs::typed::AnchorDef::cast(child) {
         Some(ToplevelItem::AnchorDefinition(ad.into()))
+    } else if let Some(vrd) = fea_rs::typed::ValueRecordDef::cast(child) {
+        Some(ToplevelItem::ValueRecordDefinition(vrd.into()))
+    } else if let Some(cs) = fea_rs::typed::ConditionSet::cast(child) {
+        Some(ToplevelItem::ConditionSet(cs.into()))
+    } else if let Some(fv) = fea_rs::typed::FeatureVariation::cast(child) {
+        Some(ToplevelItem::VariationBlock(fv.into()))
+    } else if let Some(base) = fea_rs::typed::BaseTable::cast(child) {
+        Some(ToplevelItem::Base(base.into()))
     } else if let Some(gdef) = fea_rs::typed::GdefTable::cast(child) {
         Some(ToplevelItem::Gdef(gdef.into()))
     } else if let Some(head) = fea_rs::typed::HeadTable::cast(child) {
@@ -564,36 +603,33 @@ impl FeatureFile {
         features: &str,
         glyph_names: Option<&[&str]>,
         project_root: Option<impl Into<PathBuf>>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let glyph_map = glyph_names
-            .map(|gn| {
-                let mut list = gn.join("\n");
-                list.push('\n');
-                if !list.starts_with(".notdef\n") {
-                    list = ".notdef\n".to_string() + &list;
-                }
-                fea_rs::compile::parse_glyph_order(&list)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-            })
-            .transpose()?;
+    ) -> Result<Self, crate::Error> {
+        let glyph_map = glyph_names.map(|gn| GlyphMap::from_iter(gn.iter().cloned()));
         let resolver: Box<dyn fea_rs::parse::SourceResolver> =
             if let Some(project_root) = project_root {
-                Box::new(FileSystemResolver::new(project_root.into()))
+                let path = project_root.into();
+                Box::new(FileSystemResolver::new(path))
             } else {
                 Box::new(dummyresolver::DummyResolver)
             };
         let features_text: Arc<str> = Arc::from(features);
-        let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
+        let (parse_tree, mut diagnostics) = fea_rs::parse::parse_root(
             "get_parse_tree".into(),
             glyph_map.as_ref(),
             Box::new(move |s: &Path| {
                 if s == Path::new("get_parse_tree") {
                     Ok(features_text.clone())
                 } else {
-                    resolver.get_contents(s)
+                    let path = resolver.resolve_raw_path(s.as_ref(), None);
+                    let canonical = resolver.canonicalize(&path)?;
+                    resolver.get_contents(&canonical)
                 }
             }),
         )?;
+        diagnostics.split_off_warnings();
+        if diagnostics.has_errors() {
+            return Err(crate::Error::FeatureParsing(diagnostics));
+        }
         Ok(parse_tree.into())
     }
 }
@@ -656,8 +692,8 @@ mod tests {
         assert_eq!(feature_block.name.as_str(), "smcp");
         assert_eq!(feature_block.statements.len(), 1);
         assert_eq!(
-            feature_block.as_fea(""),
-            "feature smcp {\n    sub a by a.smcp;\n} smcp;\n"
+            normalize_whitespace(&feature_block.as_fea("")),
+            normalize_whitespace("feature smcp {\n    sub a by a.smcp;\n} smcp;\n")
         );
     }
 
@@ -690,8 +726,7 @@ mod tests {
         let fea_str = std::fs::read_to_string(&path).unwrap();
         let (parsed, diag) = fea_rs::parse::parse_string(fea_str.clone());
         if diag.has_errors() {
-            println!("fea-rs didn't like file {:?}:\n{:#?}", path, diag);
-            return;
+            panic!("fea-rs didn't like file {:?}:\n{:#?}", path, diag);
         }
         let feature_file: FeatureFile = parsed.into();
         let fea_output = feature_file.as_fea("");

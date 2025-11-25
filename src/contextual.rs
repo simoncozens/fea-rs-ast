@@ -99,41 +99,37 @@ impl<T: SubOrPos> ChainedContextStatement<T> {
     }
 }
 
-impl<T: SubOrPos> AsFea for ChainedContextStatement<T> {
-    fn as_fea(&self, _indent: &str) -> String {
-        let mut res = String::new();
-        res.push_str(&format!("{} ", self.sub_or_pos));
-        if !self.prefix.is_empty() || !self.suffix.is_empty() || !self.lookups.is_empty() {
-            if !self.prefix.is_empty() {
-                let prefix_str: Vec<String> =
-                    self.prefix.iter().map(|g| g.as_fea("") + " ").collect();
-                res.push_str(&prefix_str.join(" ").to_string());
+impl<T:SubOrPos> PotentiallyContextualStatement for ChainedContextStatement<T> {
+    fn is_contextual(&self) -> bool {
+        true
+    }
+    fn prefix(&self) -> &[GlyphContainer] {
+        &self.prefix
+    }
+    fn suffix(&self) -> &[GlyphContainer] {
+        &self.suffix
+    }
+    fn force_chain(&self) -> bool {
+        true
+    }
+    fn format_begin(&self, _indent: &str) -> String {
+        format!("{} ", self.sub_or_pos)
+    }
+    fn format_contextual_parts(&self, indent: &str) -> Vec<String> {
+        let mut parts = Vec::new();
+        for (i, g) in self.glyphs.iter().enumerate() {
+            let mut s = format!("{}'", g.as_fea(indent));
+            if !self.lookups[i].is_empty() {
+                for lu in &self.lookups[i] {
+                    s.push_str(&format!(" lookup {}", lu));
+                }
             }
-            let glyphs_str: Vec<String> = self
-                .glyphs
-                .iter()
-                .enumerate()
-                .map(|(i, g)| {
-                    let mut s = format!("{}'", g.as_fea(""));
-                    if !self.lookups[i].is_empty() {
-                        for lu in &self.lookups[i] {
-                            s.push_str(&format!(" lookup {}", lu));
-                        }
-                    }
-                    s
-                })
-                .collect();
-            res.push_str(&glyphs_str.join(" "));
-            if !self.suffix.is_empty() {
-                let suffix_str: Vec<String> = self.suffix.iter().map(|g| g.as_fea("")).collect();
-                res.push_str(&format!(" {}", suffix_str.join(" ")));
-            }
-        } else {
-            let glyphs_str: Vec<String> = self.glyphs.iter().map(|g| g.as_fea("")).collect();
-            res.push_str(&glyphs_str.join(" "));
+            parts.push(s);
         }
-        res.push(';');
-        res
+        parts
+    }
+    fn format_noncontextual_parts(&self, _indent: &str) -> Vec<String> {
+        unreachable!()
     }
 }
 

@@ -259,9 +259,9 @@ impl AsFea for GdefStatement {
         }
     }
 }
-impl Into<Statement> for GdefStatement {
-    fn into(self) -> Statement {
-        match self {
+impl From<GdefStatement> for Statement {
+    fn from(val: GdefStatement) -> Self {
+        match val {
             GdefStatement::Attach(stmt) => Statement::GdefAttach(stmt),
             GdefStatement::GlyphClassDef(stmt) => Statement::GlyphClassDef(stmt),
             GdefStatement::LigatureCaretByIndex(stmt) => Statement::GdefLigatureCaretByIndex(stmt),
@@ -272,7 +272,7 @@ impl Into<Statement> for GdefStatement {
     }
 }
 impl TryFrom<Statement> for GdefStatement {
-    type Error = crate::CannotConvertError;
+    type Error = crate::Error;
     fn try_from(value: Statement) -> Result<Self, Self::Error> {
         match value {
             Statement::GdefAttach(stmt) => Ok(GdefStatement::Attach(stmt)),
@@ -283,7 +283,7 @@ impl TryFrom<Statement> for GdefStatement {
             Statement::GdefLigatureCaretByPos(stmt) => Ok(GdefStatement::LigatureCaretByPos(stmt)),
             Statement::Comment(cmt) => Ok(GdefStatement::Comment(cmt)),
             // Statement::Include(stmt) => Ok(GdefStatement::Include(stmt)),
-            _ => Err(crate::CannotConvertError),
+            _ => Err(crate::Error::CannotConvert),
         }
     }
 }

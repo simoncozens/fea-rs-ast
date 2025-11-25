@@ -1,4 +1,4 @@
-use crate::{CannotConvertError, FeatureFile, Statement};
+use crate::{FeatureFile, Statement};
 
 // Use constants as documentation
 pub(crate) const STOP: bool = false;
@@ -10,7 +10,7 @@ pub trait LayoutVisitor {
         true
     }
     fn visit_statement(&mut self, statement: &mut Statement) -> bool;
-    fn visit(&mut self, root: &mut FeatureFile) -> Result<(), CannotConvertError> {
+    fn visit(&mut self, root: &mut FeatureFile) -> Result<(), crate::Error> {
         for toplevel_item in root.statements.iter_mut() {
             let mut statement: Statement = toplevel_item.clone().into();
             self._visit_impl(&mut statement)?;
@@ -19,7 +19,7 @@ pub trait LayoutVisitor {
         Ok(())
     }
     #[allow(clippy::nonminimal_bool)]
-    fn _visit_impl(&mut self, statement: &mut Statement) -> Result<bool, CannotConvertError> {
+    fn _visit_impl(&mut self, statement: &mut Statement) -> Result<bool, crate::Error> {
         // Pre-order visit: visit the node and return if we're told to stop
         if !self.depth_first() && self.visit_statement(statement) == STOP {
             return Ok(STOP);

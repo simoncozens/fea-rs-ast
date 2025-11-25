@@ -204,7 +204,7 @@ pub enum HheaFieldType {
     LineGap,
 }
 impl AsFea for HheaFieldType {
-    fn as_fea(&self, indent: &str) -> String {
+    fn as_fea(&self, _indent: &str) -> String {
         match self {
             HheaFieldType::CaretOffset => "CaretOffset".to_string(),
             HheaFieldType::Ascender => "Ascender".to_string(),
@@ -290,7 +290,7 @@ pub enum VheaFieldType {
     VertTypoLineGap,
 }
 impl AsFea for VheaFieldType {
-    fn as_fea(&self, indent: &str) -> String {
+    fn as_fea(&self, _indent: &str) -> String {
         match self {
             VheaFieldType::VertTypoAscender => "VertTypoAscender".to_string(),
             VheaFieldType::VertTypoDescender => "VertTypoDescender".to_string(),

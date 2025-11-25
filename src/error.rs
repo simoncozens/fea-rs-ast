@@ -1,15 +1,11 @@
-use std::{error::Error, fmt::Display};
+use thiserror::Error;
 
-#[derive(Debug, Clone)]
-pub struct CannotConvertError;
-impl Display for CannotConvertError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Cannot convert Statement to target type")
-    }
-}
-
-impl Error for CannotConvertError {
-    fn description(&self) -> &str {
-        "Cannot convert Statement to target type"
-    }
+#[derive(Debug, Clone, Error)]
+pub enum Error {
+    #[error("Cannot convert Statement to target type")]
+    CannotConvert,
+    #[error("Cannot load source file: {0}")]
+    CannotLoadSourceFile(#[from] fea_rs::parse::SourceLoadError),
+    #[error("Errors encountered during feature parsing: {0:?}")]
+    FeatureParsing(fea_rs::DiagnosticSet),
 }
