@@ -143,7 +143,7 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
                         .map(|gn| SmolStr::new(gn.text()))
                         .unwrap();
 
-                    Some(GlyphContainer::GlyphRange(start..end))
+                    Some(GlyphContainer::GlyphRange(GlyphRange::new(start, end)))
                 // "GlyphNameOrRange" doesn't go into the typed AST, we have to handle it ourselves
                 } else if child.kind() == fea_rs::Kind::GlyphNameOrRange {
                     Some(GlyphContainer::GlyphNameOrRange(
@@ -159,11 +159,109 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GlyphRange {
+    /// Start glyph name of the range
+    pub start: SmolStr,
+    /// End glyph name of the range
+    pub end: SmolStr,
+}
+impl GlyphRange {
+    pub fn new(start: SmolStr, end: SmolStr) -> Self {
+        Self { start, end }
+    }
+
+    pub fn glyphset(&self) -> impl Iterator<Item = SmolStr> {
+        // OK, the rules are:
+        // <firstGlyph> and <lastGlyph> must be the same length and can differ only in one of the following ways:
+        // By a single letter from A-Z, either uppercase or lowercase.
+        // By up to 3 decimal digits in a contiguous run
+        // So first we find a common prefix and suffix
+        let start_bytes = self.start.as_bytes();
+        let end_bytes = self.end.as_bytes();
+        let mut prefix_len = 0;
+        let mut suffix_len = 0;
+        for (start_byte, end_byte) in start_bytes.iter().zip(end_bytes.iter()) {
+            if start_byte == end_byte {
+                prefix_len += 1;
+            } else {
+                break;
+            }
+        }
+        for (start_byte, end_byte) in start_bytes.iter().rev().zip(end_bytes.iter().rev()) {
+            if start_byte == end_byte {
+                suffix_len += 1;
+            } else {
+                break;
+            }
+        }
+        let start_core = &self.start[prefix_len..self.start.len() - suffix_len];
+        let end_core = &self.end[prefix_len..self.end.len() - suffix_len];
+        if start_core.len() != end_core.len() {
+            // invalid range
+            return vec![self.start.clone(), self.end.clone()].into_iter();
+        }
+        if start_core.len() == 1 {
+            // Check if both cores are a single lower case or upper case letter
+            let start_char = start_core.chars().next().unwrap();
+            let end_char = end_core.chars().next().unwrap();
+            if (start_char.is_ascii_lowercase() && end_char.is_ascii_lowercase())
+                || (start_char.is_ascii_uppercase() && end_char.is_ascii_uppercase())
+            {
+                let range = start_char as u8..=end_char as u8;
+                let glyphs: Vec<SmolStr> = range
+                    .map(|b| {
+                        SmolStr::new(format!(
+                            "{}{}{}",
+                            &self.start[..prefix_len],
+                            b as char,
+                            &self.start[self.start.len() - suffix_len..]
+                        ))
+                    })
+                    .collect();
+                return glyphs.into_iter();
+            } else {
+                // invalid range
+                return vec![self.start.clone(), self.end.clone()].into_iter();
+            }
+        }
+        // So it should be a 1 to 3 digit number
+        let start_num: Option<usize> = start_core.parse().ok();
+        let end_num: Option<usize> = end_core.parse().ok();
+        if let (Some(start_num), Some(end_num)) = (start_num, end_num) {
+            let range = start_num..=end_num;
+            // Format each number to the correct width with leading zeros
+            let glyphs: Vec<SmolStr> = range
+                .map(|n| {
+                    let mut s = String::new();
+                    s.push_str(&self.start[..prefix_len]);
+                    s.push_str(&format!("{:0width$}", n, width = start_core.len()));
+                    s.push_str(&self.start[self.start.len() - suffix_len..]);
+                    SmolStr::new(s)
+                })
+                .collect();
+            return glyphs.into_iter();
+        }
+        // invalid range
+        vec![self.start.clone(), self.end.clone()].into_iter()
+    }
+}
+impl From<Range<SmolStr>> for GlyphRange {
+    fn from(val: Range<SmolStr>) -> Self {
+        GlyphRange::new(val.start, val.end)
+    }
+}
+impl AsFea for GlyphRange {
+    fn as_fea(&self, _indent: &str) -> String {
+        format!("{} - {}", self.start.as_str(), self.end.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GlyphContainer {
     GlyphName(GlyphName),
     GlyphClass(GlyphClass),
     GlyphClassName(SmolStr),
-    GlyphRange(Range<SmolStr>),
+    GlyphRange(GlyphRange),
     GlyphNameOrRange(SmolStr),
 }
 
@@ -182,9 +280,7 @@ impl AsFea for GlyphContainer {
                     name.to_string()
                 }
             }
-            GlyphContainer::GlyphRange(range) => {
-                format!("{} - {}", range.start.as_str(), range.end.as_str())
-            }
+            GlyphContainer::GlyphRange(range) => range.as_fea(""),
             GlyphContainer::GlyphNameOrRange(name_or_range) => name_or_range.to_string(),
         }
     }
@@ -291,5 +387,46 @@ mod tests {
         println!("{:#?}", literal);
         let glyphs: GlyphClass = literal.into();
         assert_eq!(glyphs.glyphs.len(), 4);
+    }
+
+    fn test_glyphrange() {
+        let range = GlyphRange::new(SmolStr::new("a01"), SmolStr::new("a05"));
+        let glyphs: Vec<SmolStr> = range.glyphset().collect();
+        assert_eq!(
+            glyphs,
+            vec![
+                SmolStr::new("a01"),
+                SmolStr::new("a02"),
+                SmolStr::new("a03"),
+                SmolStr::new("a04"),
+                SmolStr::new("a05"),
+            ]
+        );
+
+        let range = GlyphRange::new(SmolStr::new("B"), SmolStr::new("F"));
+        let glyphs: Vec<SmolStr> = range.glyphset().collect();
+        assert_eq!(
+            glyphs,
+            vec![
+                SmolStr::new("B"),
+                SmolStr::new("C"),
+                SmolStr::new("D"),
+                SmolStr::new("E"),
+                SmolStr::new("F"),
+            ]
+        );
+
+        let range = GlyphRange::new(SmolStr::new("cat"), SmolStr::new("cet"));
+        let glyphs: Vec<SmolStr> = range.glyphset().collect();
+        assert_eq!(
+            glyphs,
+            vec![
+                SmolStr::new("cat"),
+                SmolStr::new("cbt"),
+                SmolStr::new("cct"),
+                SmolStr::new("cdt"),
+                SmolStr::new("cet"),
+            ]
+        );
     }
 }
