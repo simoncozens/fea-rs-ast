@@ -2,10 +2,24 @@
 name = "fea-rs-ast"
 version = "0.1.0"
 edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
 description = "fontTools-like AST wrapper around fea-rs parser"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/simoncozens/fea-rs-ast"
+homepage = "https://github.com/simoncozens/fea-rs-ast"
+documentation = "https://docs.rs/fea-rs-ast"
+readme = "README.md"
+keywords = ["opentype", "fonts", "fea", "fonttools", "typography"]
+categories = ["parser-implementations", "text-processing"]
+exclude = [
+    "/.github",
+    "/test-data",
+    "*.py",
+    "*.fea",
+]
 
 [dependencies]
-fea-rs = { git = "https://github.com/googlefonts/fontc.git" }
+fea-rs = "0.22.0"
 log = "0.4.28"
 smol_str = "0.3.4"
 thiserror = "2.0.17"

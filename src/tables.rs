@@ -6,11 +6,17 @@ use crate::{
     stat::StatStatement, AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT,
 };
 
+/// A helper for constructing tables which hold statements of a particular type.
 pub trait FeaTable {
+    /// The type of statement contained in this table.
     type Statement: AsFea;
+    /// The corresponding fea-rs typed table.
     type FeaRsTable: AstNode;
+    /// The tag of this table.
     const TAG: &'static str;
+    /// Convert a child node or token into a statement of this table's type, if possible.
     fn to_statement(child: &NodeOrToken) -> Option<Self::Statement>;
+    /// Extract all statements of this table's type from a fea-rs node.
     fn statements_from_node(node: &fea_rs::Node) -> Vec<Self::Statement> {
         node.iter_children()
             .filter_map(Self::to_statement)
@@ -18,8 +24,10 @@ pub trait FeaTable {
     }
 }
 
+/// A table in a feature file, parameterized by the type of statements it contains.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table<T: FeaTable> {
+    /// The statements in this table.
     pub statements: Vec<T::Statement>,
 }
 
@@ -37,6 +45,7 @@ impl<T: FeaTable> AsFea for Table<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `GDEF` table
 pub struct Gdef;
 impl FeaTable for Gdef {
     type Statement = GdefStatement;
@@ -79,6 +88,7 @@ impl From<fea_rs::typed::GdefTable> for Table<Gdef> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `head` table
 pub struct Head;
 impl FeaTable for Head {
     type Statement = HeadStatement;
@@ -99,8 +109,11 @@ impl FeaTable for Head {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A statement in the `head` table
 pub enum HeadStatement {
+    /// A comment
     Comment(Comment),
+    /// a `FontRevision` statement
     FontRevision(FontRevisionStatement),
 }
 impl AsFea for HeadStatement {
@@ -121,6 +134,7 @@ impl From<fea_rs::typed::HeadTable> for Table<Head> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `name` table
 pub struct Name;
 impl FeaTable for Name {
     type Statement = NameStatement;
@@ -140,9 +154,12 @@ impl FeaTable for Name {
     }
 }
 
+/// A statement in the `name` table
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameStatement {
+    /// A comment
     Comment(Comment),
+    /// a `NameRecord` statement
     NameRecord(NameRecord),
 }
 impl AsFea for NameStatement {
@@ -163,6 +180,7 @@ impl From<fea_rs::typed::NameTable> for Table<Name> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `STAT` table
 pub struct Stat;
 impl FeaTable for Stat {
     type Statement = StatStatement;
@@ -197,11 +215,17 @@ impl From<fea_rs::typed::StatTable> for Table<Stat> {
 // hhea
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Fields in the `hhea` table
 pub enum HheaField {
+    /// A comment
     Comment(Comment),
+    /// A `CaretOffset` statement
     CaretOffset(i16),
+    /// An `Ascender` statement
     Ascender(i16),
+    /// A `Descender` statement
     Descender(i16),
+    /// A `LineGap` statement
     LineGap(i16),
 }
 impl AsFea for HheaField {
@@ -216,10 +240,13 @@ impl AsFea for HheaField {
     }
 }
 
+/// A statement in the `hhea` table
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HheaStatement {
-    field: HheaField,
-    location: Range<usize>,
+    /// The field of this statement
+    pub field: HheaField,
+    /// The location of this statement in the source
+    pub location: Range<usize>,
 }
 impl AsFea for HheaStatement {
     fn as_fea(&self, indent: &str) -> String {
@@ -265,6 +292,7 @@ impl From<fea_rs::typed::HheaTable> for Table<Hhea> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `hhea` table
 pub struct Hhea;
 impl FeaTable for Hhea {
     type Statement = HheaStatement;
@@ -287,11 +315,16 @@ impl FeaTable for Hhea {
 
 // vhea
 
+/// A field in the `vhea` table
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VheaField {
+    /// A comment
     Comment(Comment),
+    /// A `VertTypoAscender` statement
     VertTypoAscender(i16),
+    /// A `VertTypoDescender` statement
     VertTypoDescender(i16),
+    /// A `VertTypoLineGap` statement
     VertTypoLineGap(i16),
 }
 impl AsFea for VheaField {
@@ -306,6 +339,7 @@ impl AsFea for VheaField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A statement in the `vhea` table
 pub struct VheaStatement {
     field: VheaField,
     location: Range<usize>,
@@ -353,6 +387,7 @@ impl From<fea_rs::typed::VheaTable> for Table<Vhea> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The `vhea` table
 pub struct Vhea;
 impl FeaTable for Vhea {
     type Statement = VheaStatement;

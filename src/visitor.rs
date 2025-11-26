@@ -4,12 +4,19 @@ use crate::{FeatureFile, Statement};
 pub(crate) const STOP: bool = false;
 pub(crate) const CONTINUE: bool = true;
 
+/// A visitor trait for traversing and potentially modifying the AST.
 #[allow(unused_variables)]
 pub trait LayoutVisitor {
+    /// Whether to traverse the AST in depth-first order.
     fn depth_first(&self) -> bool {
         true
     }
+    /// What to do on visiting a statement.
+    ///
+    /// You may modify the statement, then return `true` to continue traversal,
+    /// or `false` to stop.
     fn visit_statement(&mut self, statement: &mut Statement) -> bool;
+    /// Visit the entire feature file, applying the visitor to each statement.
     fn visit(&mut self, root: &mut FeatureFile) -> Result<(), crate::Error> {
         for toplevel_item in root.statements.iter_mut() {
             let mut statement: Statement = toplevel_item.clone().into();
@@ -18,6 +25,7 @@ pub trait LayoutVisitor {
         }
         Ok(())
     }
+    /// Internal implementation of the visitor pattern.
     #[allow(clippy::nonminimal_bool)]
     fn _visit_impl(&mut self, statement: &mut Statement) -> Result<bool, crate::Error> {
         // Pre-order visit: visit the node and return if we're told to stop

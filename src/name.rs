@@ -5,11 +5,16 @@ use fea_rs::typed::AstNode;
 use crate::AsFea;
 use read_fonts::tables::name::{Encoding};
 
+/// Kind of name record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameRecordKind {
+    /// A standard name record with a specific name ID
     Name(u16),
+    /// The name of the feature to be displayed in a UI
     FeatureName,
+    /// The feature size menu name
     FeatureSizeMenuName,
+    /// A name to be used in the STAT table
     StatName,
 }
 
@@ -35,6 +40,7 @@ pub struct NameRecord {
 }
 
 impl NameRecord {
+    /// Creates a new NameRecord.
     pub fn new(
         platform_id: u16,
         plat_enc_id: u16,

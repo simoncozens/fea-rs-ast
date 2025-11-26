@@ -1,29 +1,40 @@
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, GlyphOrClass},
+    Kind,
 };
 
-use crate::{AsFea, GlyphContainer};
 use crate::{
-    PotentiallyContextualStatement,
     contextual::{backtrack, context_glyphs, lookahead},
+    PotentiallyContextualStatement,
 };
+use crate::{AsFea, GlyphContainer};
 use std::ops::Range;
 
+/// A single substitution (GSUB type 1) statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SingleSubstStatement {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// The glyphs to be substituted
+    ///
+    /// Although this is a single substitution, there may be multiple
+    /// glyphs in e.g. `sub [a b] by [c d];` where `a` and `b` are
+    /// both substituted by `c` and `d` respectively.
     pub glyphs: Vec<GlyphContainer>,
+    /// The replacement glyphs
     pub replacement: Vec<GlyphContainer>,
+    /// Whether to force this substitution to be treated as contextual
     pub force_chain: bool,
 }
 
 impl SingleSubstStatement {
     /// Create a new single substitution statement.
     ///
-    /// Note the unusual argument order: `prefix` and suffix come `after`
+    /// Note the unusual argument order: `prefix` and suffix come *after*
     /// the replacement `glyphs`. `prefix`, `suffix`, `glyphs` and
     /// `replacement` should be lists of `glyph-containing objects`_. `glyphs` and
     /// `replacement` should be one-item lists.
@@ -101,13 +112,20 @@ impl From<fea_rs::typed::Gsub1> for SingleSubstStatement {
     }
 }
 
+/// A multiple substitution (GSUB type 2) statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MultipleSubstStatement {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// The glyph to be substituted
     pub glyph: GlyphContainer,
+    /// The replacement glyphs
     pub replacement: Vec<GlyphContainer>,
+    /// Whether to force this substitution to be treated as contextual
     pub force_chain: bool,
 }
 
@@ -234,13 +252,20 @@ fn inline_sub_targets(val: &fea_rs::Node) -> Vec<GlyphContainer> {
         .collect()
 }
 
+/// An alternate substitution (GSUB type 3) statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlternateSubstStatement {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// The glyph to be substituted
     pub glyph: GlyphContainer,
+    /// The replacement glyph
     pub replacement: GlyphContainer,
+    /// Whether to force this substitution to be treated as contextual
     pub force_chain: bool,
 }
 
@@ -317,13 +342,20 @@ impl From<fea_rs::typed::Gsub3> for AlternateSubstStatement {
     }
 }
 
+/// A ligature substitution (GSUB type 4) statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureSubstStatement {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// The glyphs to be substituted
     pub glyphs: Vec<GlyphContainer>,
+    /// The replacement glyph
     pub replacement: GlyphContainer,
+    /// Whether to force this substitution to be treated as contextual
     pub force_chain: bool,
 }
 
@@ -408,14 +440,20 @@ impl From<fea_rs::typed::Gsub4> for LigatureSubstStatement {
 /// A reverse chaining substitution statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReverseChainSingleSubstStatement {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// The glyphs to be substituted
     pub glyphs: Vec<GlyphContainer>,
+    /// The replacement glyphs
     pub replacements: Vec<GlyphContainer>,
 }
 
 impl ReverseChainSingleSubstStatement {
+    /// Create a new reverse chaining single substitution statement.
     pub fn new(
         glyphs: Vec<GlyphContainer>,
         replacements: Vec<GlyphContainer>,

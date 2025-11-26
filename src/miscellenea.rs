@@ -11,13 +11,19 @@ use crate::{
 /// A named anchor definition. (2.e.viii)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchorDefinition {
+    /// The X coordinate of the anchor
     pub x: Metric,
+    /// The Y coordinate of the anchor
     pub y: Metric,
+    /// The contour point index, if any
     pub contourpoint: Option<u16>,
+    /// The name of the anchor
     pub name: String,
+    /// The location of the anchor definition in the source FEA
     pub location: Range<usize>,
 }
 impl AnchorDefinition {
+    /// Creates a new `Anchor` statement.
     pub fn new(
         x: Metric,
         y: Metric,
@@ -69,9 +75,11 @@ impl From<fea_rs::typed::AnchorDef> for AnchorDefinition {
 /// A comment in a feature file
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Comment {
+    /// The text of the comment, which should include the initial `#`.
     pub text: String,
 }
 impl Comment {
+    /// Creates a new comment
     pub fn new(text: String) -> Self {
         Self { text }
     }
@@ -90,9 +98,11 @@ impl From<&str> for Comment {
 /// Example: `feature salt;`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeatureReferenceStatement {
+    /// The name of the referenced feature
     pub feature_name: String,
 }
 impl FeatureReferenceStatement {
+    /// Creates a new FeatureReferenceStatement.
     pub fn new(feature_name: String) -> Self {
         Self { feature_name }
     }
@@ -121,9 +131,11 @@ impl From<fea_rs::typed::FeatureRef> for FeatureReferenceStatement {
 /// significant decimal places.
 #[derive(Debug, Clone)]
 pub struct FontRevisionStatement {
+    /// The font revision number
     pub revision: f32,
 }
 impl FontRevisionStatement {
+    /// Create a new `FontRevision` statement.
     pub fn new(revision: f32) -> Self {
         Self { revision }
     }
@@ -158,10 +170,13 @@ impl Eq for FontRevisionStatement {}
 pub struct GlyphClassDefinition {
     /// class name as a string, without initial ``@``
     pub name: String,
+    /// The glyphs in the class
     pub glyphs: GlyphClass,
+    /// The location of the definition in the source feature file
     pub location: Range<usize>,
 }
 impl GlyphClassDefinition {
+    /// Create a new glyph class definition.
     pub fn new(name: String, glyphs: GlyphClass, location: Range<usize>) -> Self {
         Self {
             name,
@@ -196,11 +211,15 @@ impl From<fea_rs::typed::GlyphClassDef> for GlyphClassDefinition {
 /// A ``language`` statement within a feature
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageStatement {
+    /// The OpenType language tag for the language
     pub tag: String,
+    /// Whether to include the default language system
     pub include_dflt: bool,
+    /// Whether the language is required
     pub required: bool,
 }
 impl LanguageStatement {
+    /// Create a new `language` statement.
     pub fn new(tag: String, include_dflt: bool, required: bool) -> Self {
         Self {
             tag,
@@ -247,10 +266,13 @@ impl From<fea_rs::typed::Language> for LanguageStatement {
 /// A top-level ``languagesystem`` statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageSystemStatement {
+    /// The OpenType script tag for the script
     pub script: String,
+    /// The OpenType language tag for the language
     pub language: String,
 }
 impl LanguageSystemStatement {
+    /// Create a new `languagesystem` statement.
     pub fn new(script: String, language: String) -> Self {
         Self { script, language }
     }
@@ -276,10 +298,16 @@ impl From<fea_rs::typed::LanguageSystem> for LanguageSystemStatement {
 /// Represents a ``lookup ...;`` statement to include a lookup in a feature.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupReferenceStatement {
-    pub lookup_name: String, // unlike in Python
+    /// The name of the lookup to include
+    ///
+    /// Note: unlike in Python's fontTools, this is simply the name of the
+    /// lookup rather than a `LookupBlock` object.
+    pub lookup_name: String,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 impl LookupReferenceStatement {
+    /// Create a new lookup reference statement.
     pub fn new(lookup_name: String, location: Range<usize>) -> Self {
         Self {
             lookup_name,
@@ -310,9 +338,11 @@ impl From<fea_rs::typed::LookupRef> for LookupReferenceStatement {
 /// A ``script`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptStatement {
+    /// The OpenType script tag for the script
     pub tag: String,
 }
 impl ScriptStatement {
+    /// Create a new `script` statement.
     pub fn new(tag: String) -> Self {
         Self { tag }
     }
@@ -339,6 +369,7 @@ impl From<fea_rs::typed::Script> for ScriptStatement {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubtableStatement;
 impl SubtableStatement {
+    /// Create a new `subtable;` statement.
     pub fn new() -> Self {
         Self {}
     }
@@ -366,11 +397,13 @@ pub struct SizeParameters {
     pub range_start: f64,
     /// Range end in points (FEA format stores as decipoints, divided by 10 on read)
     pub range_end: f64,
+    /// Location in the source FEA file
     pub location: Range<usize>,
 }
 impl Eq for SizeParameters {}
 
 impl SizeParameters {
+    /// Create a new SizeParameters statement.
     pub fn new(
         design_size: f64,
         subfamily_id: u16,
@@ -475,6 +508,7 @@ pub struct ConditionSet {
 impl Eq for ConditionSet {}
 
 impl ConditionSet {
+    /// Create a new `conditionset` statement.
     pub fn new(name: String, conditions: Vec<(String, f32, f32)>, location: Range<usize>) -> Self {
         Self {
             name,
@@ -578,6 +612,7 @@ pub struct VariationBlock {
 }
 
 impl VariationBlock {
+    /// Create a new `variation ABCD { ... } ABCD;` statement.
     pub fn new(
         name: SmolStr,
         conditionset: String,
@@ -660,13 +695,18 @@ impl AsFea for VariationBlock {
 /// A ``lookupflag`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupFlagStatement {
+    /// The value of the flag
     pub value: u16,
+    /// Optional MarkAttachmentType
     pub mark_attachment: Option<GlyphContainer>,
+    /// Optional UseMarkFilteringSet
     pub mark_filtering_set: Option<GlyphContainer>,
+    /// Location in the source FEA file
     pub location: Range<usize>,
 }
 
 impl LookupFlagStatement {
+    /// Create a new `lookupflag` statement.
     pub fn new(
         value: u16,
         mark_attachment: Option<GlyphContainer>,
@@ -752,11 +792,15 @@ impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
 /// Python `fontTools` representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkClassDefinition {
+    /// The name of the mark class
     pub mark_class: MarkClass,
+    /// The anchor associated with this mark class glyph
     pub anchor: crate::Anchor,
+    /// The glyphs in this mark class
     pub glyphs: GlyphContainer,
 }
 impl MarkClassDefinition {
+    /// Create a new `markClass` definition.
     pub fn new(mark_class: MarkClass, anchor: crate::Anchor, glyphs: GlyphContainer) -> Self {
         Self {
             mark_class,
@@ -799,11 +843,15 @@ impl From<fea_rs::typed::MarkClassDef> for MarkClassDefinition {
 /// Represents a named value record definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecordDefinition {
+    /// The name of the value record
     pub name: SmolStr,
+    /// The value record data
     pub value: ValueRecord,
+    /// The location of the definition in the source feature file
     pub location: Range<usize>,
 }
 impl ValueRecordDefinition {
+    /// Create a new value record definition.
     pub fn new(name: SmolStr, value: ValueRecord, location: Range<usize>) -> Self {
         Self {
             name,

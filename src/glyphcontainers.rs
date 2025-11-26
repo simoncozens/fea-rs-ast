@@ -74,17 +74,20 @@ impl std::fmt::Debug for GlyphName {
 }
 
 impl GlyphName {
+    /// Creates a new `GlyphName`, representing a single named glyph.
     pub fn new(name: &str) -> Self {
         Self {
             name: SmolStr::new(name),
         }
     }
 
+    /// Returns an iterator over the glyph names in this `GlyphName`.
     pub fn glyphset(&self) -> impl Iterator<Item = &SmolStr> {
         std::iter::once(&self.name)
     }
-
-    pub fn as_fea(&self) -> String {
+}
+impl AsFea for GlyphName {
+    fn as_fea(&self, _indent: &str) -> String {
         if FEA_KEYWORDS.contains(&self.name.as_str()) {
             format!("\\{}", self.name)
         } else {
@@ -93,12 +96,16 @@ impl GlyphName {
     }
 }
 
+/// A glyph class literal, such as `[a b c]` or `[a-z A-Z]`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GlyphClass {
+    /// The glyphs in the class literal
     pub glyphs: Vec<GlyphContainer>,
+    /// The location of the glyph class in the source feature file
     pub location: Range<usize>,
 }
 impl GlyphClass {
+    /// Creates a new `GlyphClass` with the given glyph containers and location.
     pub fn new(glyphs: Vec<GlyphContainer>, location: Range<usize>) -> Self {
         Self { glyphs, location }
     }
@@ -158,6 +165,7 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
     }
 }
 
+/// A glyph range, such as `a-z` or `A01-A05`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GlyphRange {
     /// Start glyph name of the range
@@ -166,10 +174,12 @@ pub struct GlyphRange {
     pub end: SmolStr,
 }
 impl GlyphRange {
+    /// Creates a new `GlyphRange` with the given start and end glyph names.
     pub fn new(start: SmolStr, end: SmolStr) -> Self {
         Self { start, end }
     }
 
+    /// Returns an iterator over the glyph names in this `GlyphRange`.
     pub fn glyphset(&self) -> impl Iterator<Item = SmolStr> {
         // OK, the rules are:
         // <firstGlyph> and <lastGlyph> must be the same length and can differ only in one of the following ways:
@@ -256,19 +266,26 @@ impl AsFea for GlyphRange {
     }
 }
 
+/// A container for glyphs in various forms: single glyph names, glyph classes,
+/// glyph ranges, or glyph name/range literals.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GlyphContainer {
+    /// A single glyph name
     GlyphName(GlyphName),
+    /// A glyph class literal
     GlyphClass(GlyphClass),
+    /// A named glyph class
     GlyphClassName(SmolStr),
+    /// A glyph range
     GlyphRange(GlyphRange),
+    /// An ambiguity: either a glyph name or range literal, up to the user to resolve
     GlyphNameOrRange(SmolStr),
 }
 
 impl AsFea for GlyphContainer {
     fn as_fea(&self, _indent: &str) -> String {
         match self {
-            GlyphContainer::GlyphName(gn) => gn.as_fea(),
+            GlyphContainer::GlyphName(gn) => gn.as_fea(_indent),
             GlyphContainer::GlyphClass(gcs) => {
                 let inner: Vec<String> = gcs.glyphs.iter().map(|g| g.as_fea("")).collect();
                 format!("[{}]", inner.join(" "))
@@ -316,6 +333,8 @@ impl From<fea_rs::typed::GlyphClass> for GlyphContainer {
 }
 
 impl GlyphContainer {
+    /// Creates a new `GlyphContainer` representing a glyph class literal
+    /// containing the given glyph names.
     pub fn new_class(glyph_names: &[&str]) -> Self {
         let members: Vec<GlyphContainer> = glyph_names
             .iter()
@@ -327,6 +346,7 @@ impl GlyphContainer {
         ))
     }
 
+    /// Returns true if this `GlyphContainer` is an empty glyph class.
     pub fn is_empty(&self) -> bool {
         match self {
             GlyphContainer::GlyphClass(gcs) => gcs.glyphs.is_empty(),
@@ -347,9 +367,11 @@ impl GlyphContainer {
 /// The name should not begin with `@`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MarkClass {
+    /// The name of the mark class, without the leading `@`
     pub name: SmolStr,
 }
 impl MarkClass {
+    /// Creates a new `MarkClass` with the given name.
     pub fn new(name: &str) -> Self {
         Self {
             name: SmolStr::new(name),
@@ -389,6 +411,7 @@ mod tests {
         assert_eq!(glyphs.glyphs.len(), 4);
     }
 
+    #[test]
     fn test_glyphrange() {
         let range = GlyphRange::new(SmolStr::new("a01"), SmolStr::new("a05"));
         let glyphs: Vec<SmolStr> = range.glyphset().collect();

@@ -10,16 +10,23 @@ use crate::{
     ValueRecord,
 };
 
+/// A single positioning rule (GPOS type 1)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
+    /// The glyphs and their associated value records to be positioned
     pub pos: Vec<(GlyphContainer, Option<ValueRecord>)>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// Whether to force this statement to be treated as a contextual positioning rule
     pub force_chain: bool,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 
 impl SinglePosStatement {
+    /// Create a new single positioning statement.
     pub fn new(
         prefix: Vec<GlyphContainer>,
         suffix: Vec<GlyphContainer>,
@@ -100,17 +107,25 @@ impl From<fea_rs::typed::Gpos1> for SinglePosStatement {
     }
 }
 
+/// A pair positioning rule (GPOS type 2)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairPosStatement {
+    /// The first glyph or class in the pair
     pub glyphs_1: GlyphContainer,
+    /// The second glyph or class in the pair
     pub glyphs_2: GlyphContainer,
+    /// The value record for the first glyph
     pub value_record_1: ValueRecord,
+    /// The value record for the second glyph (if any)
     pub value_record_2: Option<ValueRecord>,
+    /// Whether this is an enumerated pair positioning rule
     pub enumerated: bool,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 
 impl PairPosStatement {
+    /// Create a new pair positioning statement.
     pub fn new(
         glyphs_1: GlyphContainer,
         glyphs_2: GlyphContainer,
@@ -190,15 +205,21 @@ impl From<fea_rs::typed::Gpos2> for PairPosStatement {
     }
 }
 
+/// A cursive positioning rule (GPOS type 3)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CursivePosStatement {
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
+    /// The glyph or class this rule applies to
     pub glyphclass: GlyphContainer,
+    /// The entry anchor point
     pub entry: Option<Anchor>,
+    /// The exit anchor point
     pub exit: Option<Anchor>,
 }
 
 impl CursivePosStatement {
+    /// Create a new cursive positioning statement.
     pub fn new(
         glyphclass: GlyphContainer,
         entry: Option<Anchor>,
@@ -253,12 +274,16 @@ impl From<fea_rs::typed::Gpos3> for CursivePosStatement {
 /// Example: `pos base a <anchor 625 1800> mark @TOP_MARKS;`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkBasePosStatement {
+    /// The base glyph or class
     pub base: GlyphContainer,
+    /// The list of (Anchor, MarkClass) tuples for the marks
     pub marks: Vec<(Anchor, MarkClass)>,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 
 impl MarkBasePosStatement {
+    /// Create a new mark-to-base positioning statement.
     pub fn new(
         base: GlyphContainer,
         marks: Vec<(Anchor, MarkClass)>,
@@ -335,12 +360,16 @@ impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
 /// Example: `pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS;`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkLigPosStatement {
+    /// The ligature glyph or class
     pub ligatures: GlyphContainer,
+    /// The list of lists of (Anchor, MarkClass) tuples for each component
     pub marks: Vec<Vec<(Anchor, MarkClass)>>,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 
 impl MarkLigPosStatement {
+    /// Create a new mark-to-ligature positioning statement.
     pub fn new(
         ligatures: GlyphContainer,
         marks: Vec<Vec<(Anchor, MarkClass)>>,
@@ -430,14 +459,19 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
     }
 }
 
+/// A mark-to-mark positioning rule (GPOS type 6)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkMarkPosStatement {
+    /// The base glyph or class to which the marks will be attached
     pub base_marks: GlyphContainer,
+    /// The list of (Anchor, MarkClass) tuples for the marks
     pub marks: Vec<(Anchor, MarkClass)>,
+    /// The location of the statement in the source feature file
     pub location: Range<usize>,
 }
 
 impl MarkMarkPosStatement {
+    /// Create a new mark-to-mark positioning statement.
     pub fn new(
         base_marks: GlyphContainer,
         marks: Vec<(Anchor, MarkClass)>,

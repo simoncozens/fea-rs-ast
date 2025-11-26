@@ -4,10 +4,11 @@
 
 use crate::{AsFea, FeaTable, Table};
 use fea_rs::{
-    Kind, NodeOrToken,
     typed::{AstNode as _, ScriptRecord},
+    Kind, NodeOrToken,
 };
 
+/// A min/max height record for a particular script and language
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinMax {
     pub script: String,

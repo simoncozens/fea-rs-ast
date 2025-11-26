@@ -56,13 +56,18 @@ pub(crate) fn context_glyphs(val: &fea_rs::Node) -> Vec<GlyphContainer> {
         .collect()
 }
 
-/// A chained contextual substitution statement.
+/// A chained contextual substitution statement, either GSUB or GPOS.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainedContextStatement<T: SubOrPos> {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The prefix (backtrack) glyphs
     pub prefix: Vec<GlyphContainer>,
+    /// The suffix (lookahead) glyphs
     pub suffix: Vec<GlyphContainer>,
+    /// Input glyphs
     pub glyphs: Vec<GlyphContainer>,
+    /// Lookups to apply at each glyph position
     pub lookups: Vec<Vec<SmolStr>>,
     sub_or_pos: T,
 }
@@ -301,11 +306,14 @@ impl From<fea_rs::typed::Gpos8> for Statement {
     }
 }
 
+/// Type marker that the statement is a positioning statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pos;
 
+/// Type marker that the statement is a substitution statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subst;
+/// A trait implemented by both Pos and Subst to allow generic handling
 pub trait SubOrPos: Display {}
 impl SubOrPos for Pos {}
 impl SubOrPos for Subst {}
@@ -320,9 +328,12 @@ impl Display for Subst {
     }
 }
 
+/// Either a GPOS or GSUB ignore statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IgnoreStatement<T: SubOrPos> {
+    /// The location of the statement in the source FEA.
     pub location: Range<usize>,
+    /// The chain contexts: a list of (prefix, glyphs, suffix) tuples.
     pub chain_contexts: Vec<(
         Vec<GlyphContainer>,
         Vec<GlyphContainer>,
@@ -332,6 +343,7 @@ pub struct IgnoreStatement<T: SubOrPos> {
 }
 
 impl<T: SubOrPos> IgnoreStatement<T> {
+    /// Creates a new IgnoreStatement.
     pub fn new(
         chain_contexts: Vec<(
             Vec<GlyphContainer>,

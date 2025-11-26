@@ -1,3 +1,245 @@
+#![deny(missing_docs)]
+//! # fea-rs-ast
+//!
+//! A Rust port of Python's [`fontTools.feaLib.ast`](https://fonttools.readthedocs.io/en/latest/feaLib/ast.html)
+//! library, providing a fontTools-compatible AST (Abstract Syntax Tree) for OpenType Feature Files.
+//!
+//! This crate builds on top of the [`fea-rs`](https://github.com/googlefonts/fontc/tree/main/fea-rs)
+//! parser, providing a higher-level, more ergonomic interface that matches the familiar fontTools API
+//! while leveraging Rust's type safety and performance.
+//!
+//! ## Overview
+//!
+//! OpenType Feature Files (.fea) define advanced typographic features for fonts using a
+//! domain-specific language. This crate provides:
+//!
+//! - **Parsing**: Load and parse feature files into a structured AST using `fea-rs`.
+//! - **Construction**: Programmatically build feature file structures
+//! - **Serialization**: Convert AST back to valid feature file syntax via the [`AsFea`] trait
+//! - **Transformation**: Modify AST using the visitor pattern
+//!
+//! ## Architecture
+//!
+//! The crate provides two main statement enums:
+//!
+//! - [`Statement`]: All possible statements in a feature file, regardless of context
+//! - [`ToplevelItem`]: Only statements valid at the top level of a feature file
+//!
+//! Both implement the [`AsFea`] trait for serialization back to .fea syntax.
+//!
+//! ## Examples
+//!
+//! ### Loading an Existing Feature File
+//!
+//! Parse a feature file from a string:
+//!
+//! ```rust
+//! use fea_rs_ast::{FeatureFile, AsFea};
+//!
+//! let fea_code = r#"
+//!     languagesystem DFLT dflt;
+//!     
+//!     feature smcp {
+//!         sub a by a.smcp;
+//!         sub b by b.smcp;
+//!     } smcp;
+//! "#;
+//!
+//! // Simple parsing without glyph name resolution
+//! let feature_file = FeatureFile::try_from(fea_code).unwrap();
+//!
+//! // Or with full resolution support
+//! let feature_file = FeatureFile::new_from_fea(
+//!     fea_code,
+//!     Some(&["a", "a.smcp", "b", "b.smcp"]), // Glyph names
+//!     None::<&str>, // Project root for includes
+//! ).unwrap();
+//!
+//! // Serialize back to .fea syntax
+//! let output = feature_file.as_fea("");
+//! println!("{}", output);
+//! ```
+//!
+//! ### Constructing New Statements
+//!
+//! Build feature file structures programmatically:
+//!
+//! ```rust
+//! use fea_rs_ast::*;
+//!
+//! // Create a glyph class definition
+//! let lowercase = GlyphClassDefinition::new(
+//!     "lowercase".to_string(),
+//!     GlyphClass::new(vec![
+//!         GlyphContainer::GlyphName(GlyphName::new("a")),
+//!         GlyphContainer::GlyphName(GlyphName::new("b")),
+//!         GlyphContainer::GlyphName(GlyphName::new("c")),
+//!     ], 0..0),
+//!     0..0, // location range
+//! );
+//!
+//! // Create a single substitution statement
+//! let subst = SingleSubstStatement::new(
+//!     vec![GlyphContainer::GlyphName(GlyphName::new("a"))],
+//!     vec![GlyphContainer::GlyphName(GlyphName::new("a.smcp"))],
+//!     vec![], // prefix
+//!     vec![], // suffix
+//!     0..0,   // location
+//!     false,  // force_chain
+//! );
+//!
+//! // Create a feature block
+//! let feature = FeatureBlock::new(
+//!     "smcp".into(),
+//!     vec![Statement::SingleSubst(subst)],
+//!     false, // use_extension
+//!     0..0,  // location
+//! );
+//!
+//! // Build the complete feature file
+//! let feature_file = FeatureFile::new(vec![
+//!     ToplevelItem::GlyphClassDefinition(lowercase),
+//!     ToplevelItem::Feature(feature),
+//! ]);
+//!
+//! // Serialize to .fea syntax
+//! let output = feature_file.as_fea("");
+//! assert!(output.contains("@lowercase = [a b c];"));
+//! assert!(output.contains("feature smcp"));
+//! assert!(output.contains("sub a by a.smcp;"));
+//! ```
+//!
+//! ### Using the Visitor Pattern
+//!
+//! Transform AST structures by implementing the [`LayoutVisitor`] trait:
+//!
+//! ```rust
+//! use fea_rs_ast::*;
+//!
+//! // Create a visitor that renames all features
+//! struct FeatureRenamer {
+//!     old_name: String,
+//!     new_name: String,
+//! }
+//!
+//! impl LayoutVisitor for FeatureRenamer {
+//!     fn visit_statement(&mut self, statement: &mut Statement) -> bool {
+//!         match statement {
+//!             Statement::FeatureBlock(feature) => {
+//!                 if feature.name == self.old_name.as_str() {
+//!                     feature.name = self.new_name.as_str().into();
+//!                 }
+//!             }
+//!             _ => {}
+//!         }
+//!         true // Continue visiting
+//!     }
+//! }
+//!
+//! // Use the visitor
+//! let fea_code = r#"
+//!     feature liga {
+//!         sub f i by fi;
+//!     } liga;
+//! "#;
+//!
+//! let mut feature_file = FeatureFile::try_from(fea_code).unwrap();
+//! let mut visitor = FeatureRenamer {
+//!     old_name: "liga".to_string(),
+//!     new_name: "dlig".to_string(),
+//! };
+//!
+//! visitor.visit(&mut feature_file).unwrap();
+//!
+//! let output = feature_file.as_fea("");
+//! assert!(output.contains("feature dlig"));
+//! ```
+//!
+//! ### More Complex Visitor: Glyph Name Substitution
+//!
+//! ```rust
+//! use fea_rs_ast::*;
+//! use std::collections::HashMap;
+//!
+//! // Visitor that replaces glyph names throughout the AST
+//! struct GlyphNameReplacer {
+//!     replacements: HashMap<String, String>,
+//! }
+//!
+//! impl LayoutVisitor for GlyphNameReplacer {
+//!     fn visit_statement(&mut self, statement: &mut Statement) -> bool {
+//!         // Replace glyph names in various statement types
+//!         match statement {
+//!             Statement::SingleSubst(subst) => {
+//!                 for container in &mut subst.glyphs {
+//!                     self.replace_in_container(container);
+//!                 }
+//!                 for container in &mut subst.replacement {
+//!                     self.replace_in_container(container);
+//!                 }
+//!             }
+//!             Statement::GlyphClassDefinition(gcd) => {
+//!                 for container in &mut gcd.glyphs.glyphs {
+//!                     self.replace_in_container(container);
+//!                 }
+//!             }
+//!             _ => {}
+//!         }
+//!         true
+//!     }
+//! }
+//!
+//! impl GlyphNameReplacer {
+//!     fn replace_in_container(&self, container: &mut GlyphContainer) {
+//!         match container {
+//!             GlyphContainer::GlyphName(gn) => {
+//!                 if let Some(new_name) = self.replacements.get(gn.name.as_str()) {
+//!                     gn.name = new_name.as_str().into();
+//!                 }
+//!             }
+//!             GlyphContainer::GlyphClass(gc) => {
+//!                 for glyph_container in &mut gc.glyphs {
+//!                     self.replace_in_container(glyph_container);
+//!                 }
+//!             }
+//!             _ => {}
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! ## Feature Coverage
+//!
+//! This crate supports most OpenType feature file constructs:
+//!
+//! - **GSUB**: Single, Multiple, Alternate, Ligature, Contextual, and Reverse Chaining substitutions
+//! - **GPOS**: Single, Pair, Cursive, Mark-to-Base, Mark-to-Ligature, and Mark-to-Mark positioning
+//! - **Tables**: GDEF, BASE, head, hhea, name, OS/2, STAT, vhea
+//! - **Contextual Rules**: Chaining context and ignore statements
+//! - **Variable Fonts**: Conditionsets and variation blocks
+//! - **Lookups**: Lookup blocks with flags and references
+//! - **Features**: Feature blocks with useExtension
+//!
+//! Features which fea-rs parses which this crate does not currently support:
+//!
+//! - Glyphs number variables in value records
+//! - CID-keyed glyph names
+//!
+//! ## Compatibility
+//!
+//! The API closely mirrors fontTools' Python API where practical, making it easier to port
+//! existing Python code to Rust. Key differences:
+//!
+//! - Rust's type system provides compile-time guarantees about statement validity
+//! - The [`Statement`] enum distinguishes between all possible statements
+//! - The [`ToplevelItem`] enum ensures only valid top-level constructs
+//! - Location tracking uses byte ranges (`Range<usize>`) instead of line/column numbers
+//!
+//! ## Re-exports
+//!
+//! This crate re-exports the underlying [`fea_rs`] parser for advanced use cases where
+//! direct access to the parse tree is needed.
+
 use std::{
     ops::Range,
     path::{Path, PathBuf},
@@ -37,7 +279,9 @@ use crate::{base::Base, os2::Os2};
 
 pub(crate) const SHIFT: &str = "    ";
 
+/// Trait for converting AST nodes back to feature file syntax.
 pub trait AsFea {
+    /// Convert the AST node to feature file syntax with the given indentation.
     fn as_fea(&self, indent: &str) -> String;
 }
 
@@ -45,60 +289,109 @@ pub trait AsFea {
 // here, regardless of context, because we need to be able to
 // treat them as a heterogeneous collection when we do visiting etc.
 // We split them up by context in later enums.
+/// An AST node representing a single statement in a feature file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     // GSUB statements
+    /// A single substitution (GSUB type 1) statement: `sub a by b;`
     SingleSubst(SingleSubstStatement),
+    /// A multiple substitution (GSUB type 2) statement: `sub a by b c;`
     MultipleSubst(MultipleSubstStatement),
+    /// An alternate substitution (GSUB type 3) statement: `sub a from [b c d];`
     AlternateSubst(AlternateSubstStatement),
+    /// A ligature substitution (GSUB type 4) statement: `sub a b by c;`
     LigatureSubst(LigatureSubstStatement),
+    /// A reverse chaining contextual single substitution (GSUB type 8) statement
     ReverseChainSubst(ReverseChainSingleSubstStatement),
+    /// A chaining contextual substitution (GSUB type 6) statement: `sub a' lookup foo b;`
     ChainedContextSubst(ChainedContextStatement<Subst>),
+    /// An ignore substitution rule: `ignore sub a b;`
     IgnoreSubst(IgnoreStatement<Subst>),
     // GPOS
+    /// A single adjustment positioning (GPOS type 1) statement: `pos a <10 0 20 0>;`
     SinglePos(SinglePosStatement),
+    /// A pair adjustment positioning (GPOS type 2) statement: `pos a b <10 0 20 0>;`
     PairPos(PairPosStatement),
+    /// A cursive attachment positioning (GPOS type 3) statement
     CursivePos(CursivePosStatement),
+    /// A mark-to-base attachment positioning (GPOS type 4) statement
     MarkBasePos(MarkBasePosStatement),
+    /// A mark-to-ligature attachment positioning (GPOS type 5) statement
     MarkLigPos(MarkLigPosStatement),
+    /// A mark-to-mark attachment positioning (GPOS type 6) statement
     MarkMarkPos(MarkMarkPosStatement),
+    /// A chaining contextual positioning (GPOS type 8) statement: `pos a' lookup foo b;`
     ChainedContextPos(ChainedContextStatement<Pos>),
+    /// An ignore positioning rule: `ignore pos a b;`
     IgnorePos(IgnoreStatement<Pos>),
     // Miscellenea
+    /// An anchor definition: `anchorDef 100 200 contourpoint 5 MyAnchor;`
     AnchorDefinition(AnchorDefinition),
+    /// A mark class definition: `markClass a <anchor 100 200> @TOP_MARKS;`
     MarkClassDefinition(MarkClassDefinition),
+    /// A comment in the feature file: `# This is a comment`
     Comment(Comment),
+    /// A feature name statement within a `featureNames` block
     FeatureNameStatement(NameRecord),
+    /// A font revision statement: `FontRevision 1.000;`
     FontRevision(FontRevisionStatement),
+    /// A feature reference statement: `feature liga;`
     FeatureReference(FeatureReferenceStatement),
+    /// A glyph class definition: `@lowercase = [a b c];`
     GlyphClassDefinition(GlyphClassDefinition),
+    /// A language statement: `language dflt;`
     Language(LanguageStatement),
+    /// A language system statement: `languagesystem DFLT dflt;`
     LanguageSystem(LanguageSystemStatement),
+    /// A lookup flag statement: `lookupflag RightToLeft;`
     LookupFlag(LookupFlagStatement),
+    /// A lookup reference statement: `lookup MyLookup;`
     LookupReference(LookupReferenceStatement),
+    /// Size feature parameters: `parameters 10.0 0;`
     SizeParameters(SizeParameters),
+    /// A size menu name statement: `sizemenuname 3 1 0x409 "Small";`
     SizeMenuName(NameRecord),
+    /// A subtable statement: `subtable;`
     Subtable(SubtableStatement),
+    /// A script statement: `script latn;`
     Script(ScriptStatement),
+    /// A value record definition: `valueRecordDef 10 MyValue;`
     ValueRecordDefinition(ValueRecordDefinition),
+    /// A condition set for variable fonts: `conditionset heavy { wght 700 900; } heavy;`
     ConditionSet(ConditionSet),
+    /// A variation block for variable fonts: `variation rvrn heavy { ... } rvrn;`
     VariationBlock(VariationBlock),
     // Tables and blocks
+    /// A BASE table definition: `table BASE { ... } BASE;`
     Base(Table<Base>),
+    /// A GDEF table definition: `table GDEF { ... } GDEF;`
     Gdef(Table<Gdef>),
+    /// A head table definition: `table head { ... } head;`
     Head(Table<Head>),
+    /// An hhea table definition: `table hhea { ... } hhea;`
     Hhea(Table<Hhea>),
+    /// A name table definition: `table name { ... } name;`
     Name(Table<Name>),
+    /// An OS/2 table definition: `table OS/2 { ... } OS/2;`
     Os2(Table<Os2>),
+    /// A STAT table definition: `table STAT { ... } STAT;`
     Stat(Table<Stat>),
+    /// A vhea table definition: `table vhea { ... } vhea;`
     Vhea(Table<Vhea>),
+    /// A feature block: `feature liga { ... } liga;`
     FeatureBlock(FeatureBlock),
+    /// A lookup block: `lookup MyLookup { ... } MyLookup;`
     LookupBlock(LookupBlock),
+    /// A nested block (e.g., `featureNames { ... };`)
     NestedBlock(NestedBlock),
     // GDEF-related statements
+    /// A GDEF Attach statement: `Attach a 1 2 3;`
     GdefAttach(AttachStatement),
+    /// A GDEF GlyphClassDef statement: `GlyphClassDef [a b], [c d], , [e f];`
     GdefClassDef(GlyphClassDefStatement),
+    /// A GDEF LigatureCaretByIndex statement: `LigatureCaret a 1 2;`
     GdefLigatureCaretByIndex(LigatureCaretByIndexStatement),
+    /// A GDEF LigatureCaretByPos statement: `LigatureCaretByPos a 100 200;`
     GdefLigatureCaretByPos(LigatureCaretByPosStatement),
 }
 impl AsFea for Statement {
@@ -262,15 +555,21 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
     }
 }
 
+/// A named feature block. (`feature foo { ... } foo;`)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeatureBlock {
+    /// The name of the feature (also called the tag)
     pub name: SmolStr,
+    /// The statements in the feature block
     pub statements: Vec<Statement>,
+    /// Whether the feature uses `useExtension`
     pub use_extension: bool,
+    /// The position of the feature block in the source
     pub pos: Range<usize>,
 }
 
 impl FeatureBlock {
+    /// Creates a new FeatureBlock.
     pub fn new(
         name: SmolStr,
         statements: Vec<Statement>,
@@ -320,15 +619,21 @@ impl From<fea_rs::typed::Feature> for FeatureBlock {
     }
 }
 
+/// A named lookup block. (`lookup foo { ... } foo;`)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupBlock {
+    /// The name of the lookup
     pub name: SmolStr,
+    /// The statements in the lookup block
     pub statements: Vec<Statement>,
+    /// Whether the lookup should be placed in a separate extension subtable
     pub use_extension: bool,
+    /// The position of the lookup block in the source
     pub pos: Range<usize>,
 }
 
 impl LookupBlock {
+    /// Creates a new LookupBlock.
     pub fn new(
         name: SmolStr,
         statements: Vec<Statement>,
@@ -382,10 +687,14 @@ impl From<fea_rs::typed::LookupBlock> for LookupBlock {
     }
 }
 
+/// A nested block containing statements (e.g., `featureNames { ... };`)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NestedBlock {
+    /// The tag identifying the block type
     pub tag: SmolStr,
+    /// The statements contained in the block
     pub statements: Vec<Statement>,
+    /// The position of the block in the source
     pub pos: Range<usize>,
 }
 
@@ -443,27 +752,50 @@ impl From<fea_rs::typed::FeatureNames> for NestedBlock {
     }
 }
 
+/// Statements that can appear at the top level of a feature file.
+///
+/// This is a subset of [`Statement`] containing only constructs that are
+/// valid at the top level, excluding statements that can only appear within
+/// features, lookups, or table definitions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToplevelItem {
+    /// A glyph class definition: `@lowercase = [a b c];`
     GlyphClassDefinition(GlyphClassDefinition),
+    /// A mark class definition: `markClass a <anchor 100 200> @TOP_MARKS;`
     MarkClassDefinition(MarkClassDefinition),
+    /// A language system statement: `languagesystem DFLT dflt;`
     LanguageSystem(LanguageSystemStatement),
     // Include(IncludeStatement),
+    /// A feature block: `feature liga { ... } liga;`
     Feature(FeatureBlock),
+    /// A lookup block: `lookup MyLookup { ... } MyLookup;`
     Lookup(LookupBlock),
+    /// A comment in the feature file: `# This is a comment`
     Comment(Comment),
+    /// An anchor definition: `anchorDef 100 200 contourpoint 5 MyAnchor;`
     AnchorDefinition(AnchorDefinition),
+    /// A value record definition: `valueRecordDef 10 MyValue;`
     ValueRecordDefinition(ValueRecordDefinition),
+    /// A condition set for variable fonts: `conditionset heavy { wght 700 900; } heavy;`
     ConditionSet(ConditionSet),
+    /// A variation block for variable fonts: `variation rvrn heavy { ... } rvrn;`
     VariationBlock(VariationBlock),
     // Tables
+    /// A BASE table definition: `table BASE { ... } BASE;`
     Base(Table<Base>),
+    /// A GDEF table definition: `table GDEF { ... } GDEF;`
     Gdef(Table<Gdef>),
+    /// A head table definition: `table head { ... } head;`
     Head(Table<Head>),
+    /// An hhea table definition: `table hhea { ... } hhea;`
     Hhea(Table<Hhea>),
+    /// A name table definition: `table name { ... } name;`
     Name(Table<Name>),
+    /// An OS/2 table definition: `table OS/2 { ... } OS/2;`
     Os2(Table<Os2>),
+    /// A STAT table definition: `table STAT { ... } STAT;`
     Stat(Table<Stat>),
+    /// A vhea table definition: `table vhea { ... } vhea;`
     Vhea(Table<Vhea>),
 }
 impl From<ToplevelItem> for Statement {
@@ -588,18 +920,55 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
     }
 }
 
+/// A complete OpenType Feature File.
+///
+/// This is the root structure representing a parsed .fea file, containing
+/// a sequence of top-level statements such as glyph class definitions,
+/// feature blocks, lookup blocks, and table definitions.
+///
+/// # Examples
+///
+/// ```
+/// use fea_rs_ast::FeatureFile;
+///
+/// let fea_code = "languagesystem DFLT dflt;";
+/// let feature_file = FeatureFile::try_from(fea_code).unwrap();
+/// ```
 pub struct FeatureFile {
+    /// The top-level statements in the feature file
     pub statements: Vec<ToplevelItem>,
 }
 impl FeatureFile {
+    /// Creates a new `FeatureFile` from a list of top-level statements.
     pub fn new(statements: Vec<ToplevelItem>) -> Self {
         Self { statements }
     }
 
+    /// Returns an iterator over the top-level statements in the file.
     pub fn iter(&self) -> impl Iterator<Item = &ToplevelItem> {
         self.statements.iter()
     }
 
+    /// Parses a feature file from a string with optional glyph name resolution.
+    ///
+    /// # Arguments
+    ///
+    /// * `features` - The feature file source code as a string
+    /// * `glyph_names` - Optional list of glyph names for validation and range expansion
+    /// * `project_root` - Optional project root directory for resolving `include` statements
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use fea_rs_ast::FeatureFile;
+    ///
+    /// let fea_code = "languagesystem DFLT dflt;";
+    /// let feature_file = FeatureFile::new_from_fea(
+    ///     fea_code,
+    ///     None::<&[&str]>,
+    ///     None::<&str>,
+    /// ).unwrap();
+    /// ```
     pub fn new_from_fea(
         features: &str,
         glyph_names: Option<&[&str]>,

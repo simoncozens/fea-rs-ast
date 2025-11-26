@@ -162,7 +162,7 @@ impl From<Os2TableItem> for Os2Statement {
                     location: vendor_record.range(),
                 }
             }
-            Os2TableItem::FamilyClass(os2_family_class) => todo!(),
+            Os2TableItem::FamilyClass(_os2_family_class) => todo!(),
         }
     }
 }

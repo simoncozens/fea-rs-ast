@@ -7,11 +7,15 @@ use crate::{AsFea, Comment, GlyphContainer, Statement};
 /// A ``GDEF`` table ``Attach`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachStatement {
+    /// The glyphs to which the attachment points apply
     pub glyphs: GlyphContainer,
+    /// The contour point indices
     pub contour_points: Vec<usize>,
+    /// The location of the statement in the source
     pub location: Range<usize>,
 }
 impl AttachStatement {
+    /// Creates a new `Attach` statement.
     pub fn new(glyphs: GlyphContainer, contour_points: Vec<usize>, location: Range<usize>) -> Self {
         Self {
             glyphs,
@@ -55,14 +59,20 @@ impl From<fea_rs::typed::GdefAttach> for AttachStatement {
 /// and component glyphs respectively. Any parameter can be None.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlyphClassDefStatement {
+    /// The base glyphs class (or None)
     pub base_glyphs: Option<GlyphContainer>,
+    /// The ligature glyphs class (or None)
     pub ligature_glyphs: Option<GlyphContainer>,
+    /// The mark glyphs class (or None)
     pub mark_glyphs: Option<GlyphContainer>,
+    /// The component glyphs class (or None)
     pub component_glyphs: Option<GlyphContainer>,
+    /// The location of the statement in the source
     pub location: Range<usize>,
 }
 
 impl GlyphClassDefStatement {
+    /// Creates a new `GlyphClassDef` statement.
     pub fn new(
         base_glyphs: Option<GlyphContainer>,
         ligature_glyphs: Option<GlyphContainer>,
@@ -141,12 +151,16 @@ impl From<fea_rs::typed::GdefClassDef> for GlyphClassDefStatement {
 /// A ``GDEF`` table ``LigatureCaretByIndex`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureCaretByIndexStatement {
+    /// The glyphs to which the caret indices apply
     pub glyphs: GlyphContainer,
+    /// The caret indices
     pub carets: Vec<usize>,
+    /// The location of the statement in the source
     pub location: Range<usize>,
 }
 
 impl LigatureCaretByIndexStatement {
+    /// Creates a new `LigatureCaretByIndex` statement.
     pub fn new(glyphs: GlyphContainer, carets: Vec<usize>, location: Range<usize>) -> Self {
         Self {
             glyphs,
@@ -193,12 +207,16 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByIndexStatement {
 /// A ``GDEF`` table ``LigatureCaretByPos`` statement
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureCaretByPosStatement {
+    /// The glyphs to which the caret positions apply
     pub glyphs: GlyphContainer,
+    /// The caret positions
     pub carets: Vec<i16>,
+    /// The location of the statement in the source
     pub location: Range<usize>,
 }
 
 impl LigatureCaretByPosStatement {
+    /// Creates a new `LigatureCaretByPos` statement.
     pub fn new(glyphs: GlyphContainer, carets: Vec<i16>, location: Range<usize>) -> Self {
         Self {
             glyphs,
@@ -238,12 +256,18 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByPosStatement {
     }
 }
 
+/// A statement in a `table GDEF { ... } GDEF` block
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GdefStatement {
+    /// A ``GDEF`` table ``Attach`` statement
     Attach(AttachStatement),
+    /// A ``GDEF`` table ``GlyphClassDef`` statement
     GlyphClassDef(GlyphClassDefStatement),
+    /// A ``GDEF`` table ``LigatureCaretByIndex`` statement
     LigatureCaretByIndex(LigatureCaretByIndexStatement),
+    /// A ``GDEF`` table ``LigatureCaretByPos`` statement
     LigatureCaretByPos(LigatureCaretByPosStatement),
+    /// A comment
     Comment(Comment),
     // Include(IncludeStatement),
 }

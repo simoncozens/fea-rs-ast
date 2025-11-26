@@ -12,7 +12,9 @@ use crate::AsFea;
 /// A metric, which is potentially variable.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Metric {
+    /// A simple scalar metric
     Scalar(i16),
+    /// A variable metric with different values across the design space
     Variable(Vec<(IndexMap<SmolStr, i16>, i16)>),
 }
 impl From<i16> for Metric {
@@ -57,7 +59,7 @@ impl From<fea_rs::typed::Metric> for Metric {
                 }
                 Metric::Variable(variations)
             }
-            fea_rs::typed::Metric::GlyphsAppNumber(glyphs_app_number) => todo!(),
+            fea_rs::typed::Metric::GlyphsAppNumber(_glyphs_app_number) => todo!(),
         }
     }
 }
@@ -104,17 +106,28 @@ impl AsFea for Metric {
 }
 
 type DeviceTable = Vec<(u8, i8)>;
+/// A `ValueRecord` element, used inside a `pos` rule to change a glyph's position
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecord {
+    /// The horizontal placement adjustment
     pub x_placement: Option<Metric>,
+    /// The vertical placement adjustment
     pub y_placement: Option<Metric>,
+    /// The horizontal advance adjustment
     pub x_advance: Option<Metric>,
+    /// The vertical advance adjustment
     pub y_advance: Option<Metric>,
+    /// The horizontal placement device table
     pub x_placement_device: Option<DeviceTable>,
+    /// The vertical placement device table
     pub y_placement_device: Option<DeviceTable>,
+    /// The horizontal advance device table
     pub x_advance_device: Option<DeviceTable>,
+    /// The vertical advance device table
     pub y_advance_device: Option<DeviceTable>,
+    /// Whether this is a vertical value record
     pub vertical: bool,
+    /// The location of the value record in the source FEA.
     pub location: Range<usize>,
 }
 
@@ -132,6 +145,7 @@ fn device_to_string(device: &Option<DeviceTable>) -> String {
 }
 
 impl ValueRecord {
+    /// Creates a new ValueRecord.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         x_placement: Option<Metric>,
@@ -158,6 +172,7 @@ impl ValueRecord {
             location,
         }
     }
+    /// Returns true if any of the fields are Some.
     pub fn is_some(&self) -> bool {
         self.x_placement.is_some()
             || self.y_placement.is_some()
@@ -169,6 +184,7 @@ impl ValueRecord {
             || self.y_advance_device.is_some()
     }
 
+    /// Creates a new ValueRecord in format A.
     pub fn new_format_a(advance: i16, vertical: bool, location: Range<usize>) -> Self {
         if vertical {
             Self::new(
@@ -199,6 +215,7 @@ impl ValueRecord {
         }
     }
 
+    /// Creates a new ValueRecord in format B.
     pub fn new_format_b(
         x_placement: i16,
         y_placement: i16,
@@ -385,16 +402,24 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
 /// Other values should be integer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Anchor {
+    /// The horizontal coordinate of the anchor
     pub x: Metric,
+    /// The vertical coordinate of the anchor
     pub y: Metric,
+    /// The optional name of the anchor
     pub name: Option<SmolStr>,
+    /// The optional contour point index
     pub contourpoint: Option<u16>,
+    /// The optional horizontal device table
     pub x_device_table: Option<DeviceTable>,
+    /// The optional vertical device table
     pub y_device_table: Option<DeviceTable>,
+    /// The location of the anchor in the source FEA.
     pub location: Range<usize>,
 }
 
 impl Anchor {
+    /// Creates a new Anchor.
     pub fn new(
         x: Metric,
         y: Metric,
@@ -415,6 +440,7 @@ impl Anchor {
         }
     }
 
+    /// Creates a new simple Anchor with x and y coordinates.
     pub fn new_simple(x: i16, y: i16, location: Range<usize>) -> Self {
         Self {
             x: x.into(),
@@ -427,6 +453,7 @@ impl Anchor {
         }
     }
 
+    /// Creates a new named Anchor.
     pub fn new_named(name: SmolStr, location: Range<usize>) -> Self {
         Self {
             x: 0.into(),
