@@ -7,7 +7,7 @@ table STAT {
 
     ElidedFallbackName {
         name "Roman";
-        name 3 1 1041 "ローマン";
+        name 3 1 1041 "\30ed\30fc\30de\30f3";
     };
 
     DesignAxis opsz 0 {
@@ -27,9 +27,9 @@ table STAT {
     };  # here comment
 
     AxisValue {
-        location opsz 8;  # comment here
-        location wdth 400; # another comment
-        name "Caption"; # more comments
+        location opsz 8;
+        location wdth 400;
+        name "Caption";
     };
 
     AxisValue {
@@ -103,7 +103,7 @@ table STAT {
     AxisValue {
         location ital 0;
         name "Roman";
-        flag ElidableAxisValueName; # flag comment
+        flag ElidableAxisValueName;
     };
 
 } STAT;
