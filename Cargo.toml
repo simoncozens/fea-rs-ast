@@ -1,8 +1,8 @@
 [package]
 name = "fea-rs-ast"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Simon Cozens <simon@simon-cozens.org>"]
 description = "fontTools-like AST wrapper around fea-rs parser"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/simoncozens/fea-rs-ast"
