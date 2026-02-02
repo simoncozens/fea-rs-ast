@@ -564,6 +564,7 @@ mod tests {
                     y_advance_device: None,
                     vertical: false,
                     location: 0..0,
+                    name: None,
                 }),
             )],
             false,
@@ -609,6 +610,7 @@ mod tests {
                 y_advance_device: None,
                 vertical: false,
                 location: 0..0,
+                name: None,
             },
             Some(ValueRecord {
                 x_advance: Some(30.into()),
@@ -621,6 +623,7 @@ mod tests {
                 y_advance_device: None,
                 vertical: false,
                 location: 0..0,
+                name: None,
             }),
             false,
             0..10,

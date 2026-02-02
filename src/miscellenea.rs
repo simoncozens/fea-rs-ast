@@ -863,7 +863,7 @@ impl ValueRecordDefinition {
 
 impl AsFea for ValueRecordDefinition {
     fn as_fea(&self, _indent: &str) -> String {
-        format!("valueRecord {} {};", self.name, self.value.as_fea(""))
+        format!("valueRecordDef {} {};", self.value.as_fea(""), self.name)
     }
 }
 

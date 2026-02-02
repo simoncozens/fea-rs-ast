@@ -16,6 +16,8 @@ pub enum Metric {
     Scalar(i16),
     /// A variable metric with different values across the design space
     Variable(Vec<(IndexMap<SmolStr, i16>, i16)>),
+    /// A GlyphsAppNumber metric
+    GlyphsAppNumber(String),
 }
 impl From<i16> for Metric {
     fn from(val: i16) -> Self {
@@ -36,6 +38,9 @@ impl std::hash::Hash for Metric {
                     }
                     state.write_i16(*value);
                 }
+            }
+            Metric::GlyphsAppNumber(val) => {
+                state.write(val.as_bytes());
             }
         }
     }
@@ -59,7 +64,13 @@ impl From<fea_rs::typed::Metric> for Metric {
                 }
                 Metric::Variable(variations)
             }
-            fea_rs::typed::Metric::GlyphsAppNumber(_glyphs_app_number) => todo!(),
+            fea_rs::typed::Metric::GlyphsAppNumber(glyphs_app_number) => Metric::GlyphsAppNumber(
+                glyphs_app_number
+                    .node()
+                    .iter_tokens()
+                    .map(|t| t.as_str())
+                    .collect(),
+            ),
         }
     }
 }
@@ -89,7 +100,7 @@ impl AsFea for Metric {
                 let mut res = String::from("(");
                 for (i, (location, value)) in variations.iter().enumerate() {
                     if i > 0 {
-                        res.push_str(" ");
+                        res.push(' ');
                     }
                     let loc_str = location
                         .iter()
@@ -101,6 +112,7 @@ impl AsFea for Metric {
                 res.push(')');
                 res
             }
+            Metric::GlyphsAppNumber(val) => val.clone(),
         }
     }
 }
@@ -129,6 +141,12 @@ pub struct ValueRecord {
     pub vertical: bool,
     /// The location of the value record in the source FEA.
     pub location: Range<usize>,
+    /// An optional name for the value record
+    ///
+    /// If provided, no other fields are used. These are rare enough that I
+    /// don't believe it's worth wrapping them in an enum variant and making the
+    /// developer experience worse for everyone else.
+    pub name: Option<SmolStr>,
 }
 
 fn device_to_string(device: &Option<DeviceTable>) -> String {
@@ -158,6 +176,7 @@ impl ValueRecord {
         y_advance_device: Option<DeviceTable>,
         vertical: bool,
         location: Range<usize>,
+        name: Option<SmolStr>,
     ) -> Self {
         Self {
             x_placement,
@@ -170,6 +189,7 @@ impl ValueRecord {
             y_advance_device,
             vertical,
             location,
+            name,
         }
     }
     /// Returns true if any of the fields are Some.
@@ -182,6 +202,7 @@ impl ValueRecord {
             || self.y_placement_device.is_some()
             || self.x_advance_device.is_some()
             || self.y_advance_device.is_some()
+            || self.name.is_some()
     }
 
     /// Creates a new ValueRecord in format A.
@@ -198,6 +219,7 @@ impl ValueRecord {
                 None,
                 vertical,
                 location,
+                None,
             )
         } else {
             Self::new(
@@ -211,6 +233,7 @@ impl ValueRecord {
                 None,
                 vertical,
                 location,
+                None,
             )
         }
     }
@@ -235,6 +258,24 @@ impl ValueRecord {
             None,
             vertical,
             location,
+            None,
+        )
+    }
+
+    /// Creates a new named ValueRecord.
+    pub fn new_named(name: SmolStr, location: Range<usize>) -> Self {
+        Self::new(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            location,
+            Some(name),
         )
     }
 }
@@ -243,6 +284,9 @@ impl AsFea for ValueRecord {
     fn as_fea(&self, _indent: &str) -> String {
         if !self.is_some() {
             return "<NULL>".to_string();
+        }
+        if let Some(name) = &self.name {
+            return name.to_string();
         }
         let (x, y) = (&self.x_placement, &self.y_placement);
         let (x_advance, y_advance) = (&self.x_advance, &self.y_advance);
@@ -308,6 +352,7 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
                 None,
                 false,
                 val.node().range(),
+                None,
             );
         }
         // Count the integer values
@@ -328,6 +373,7 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
                 y_advance_device: None,
                 vertical: false,
                 location: val.node().range(),
+                name: None,
             };
         } else if numbers.len() == 4 {
             // Format B or C - ignore format C for now
@@ -352,6 +398,7 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
                     y_placement_device: None,
                     x_advance_device: None,
                     y_advance_device: None,
+                    name: None,
                 };
             }
             let x_pla_device = devices.first().cloned();
@@ -369,9 +416,14 @@ impl From<fea_rs::typed::ValueRecord> for ValueRecord {
                 y_adv_device,
                 false,
                 val.node().range(),
+                None,
             );
         }
-        panic!("Invalid ValueRecord format");
+        // Oh boy, is it named?
+        if let Some(name) = val.node().iter_tokens().find(|t| t.kind == Kind::Ident) {
+            return Self::new_named(name.text.clone(), val.node().range());
+        }
+        panic!("Invalid ValueRecord {:?} encountered in FEA AST", val)
     }
 }
 
@@ -547,6 +599,7 @@ mod tests {
             None,
             false,
             0..0,
+            None,
         );
         assert_eq!(val.as_fea(""), "<1 2 3 4>");
 
