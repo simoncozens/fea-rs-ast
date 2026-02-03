@@ -286,7 +286,7 @@ impl AsFea for ValueRecord {
             return "<NULL>".to_string();
         }
         if let Some(name) = &self.name {
-            return name.to_string();
+            return format!("<{}>", name);
         }
         let (x, y) = (&self.x_placement, &self.y_placement);
         let (x_advance, y_advance) = (&self.x_advance, &self.y_advance);
