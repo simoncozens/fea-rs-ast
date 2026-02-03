@@ -1,13 +1,12 @@
 use fea_rs::{
-    typed::{AstNode as _, GlyphOrClass},
     Kind,
+    typed::{AstNode as _, GlyphOrClass},
 };
 
 use crate::{
+    AsFea, GlyphContainer, PotentiallyContextualStatement,
     contextual::{backtrack, context_glyphs, lookahead},
-    PotentiallyContextualStatement,
 };
-use crate::{AsFea, GlyphContainer};
 use std::ops::Range;
 
 /// A single substitution (GSUB type 1) statement

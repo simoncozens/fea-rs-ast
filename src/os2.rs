@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, Number, Os2TableItem},
     NodeOrToken,
+    typed::{AstNode as _, Number, Os2TableItem},
 };
 use smol_str::SmolStr;
 

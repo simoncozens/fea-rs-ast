@@ -263,7 +263,7 @@ mod visitor;
 pub use contextual::*;
 pub use error::Error;
 pub use fea_rs;
-use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, GlyphMap, NodeOrToken, ParseTree};
+use fea_rs::{GlyphMap, NodeOrToken, ParseTree, parse::FileSystemResolver, typed::AstNode as _};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;

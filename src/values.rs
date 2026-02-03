@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, LocationSpec, LocationValue, Number},
     Kind,
+    typed::{AstNode as _, LocationSpec, LocationValue, Number},
 };
 use indexmap::IndexMap;
 use smol_str::SmolStr;
@@ -441,11 +441,7 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
         }
     }
 
-    if table.is_empty() {
-        None
-    } else {
-        Some(table)
-    }
+    if table.is_empty() { None } else { Some(table) }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.

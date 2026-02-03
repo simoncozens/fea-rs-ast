@@ -3,7 +3,7 @@ use std::ops::Range;
 use fea_rs::typed::AstNode;
 
 use crate::AsFea;
-use read_fonts::tables::name::{Encoding};
+use read_fonts::tables::name::Encoding;
 
 /// Kind of name record.
 #[derive(Debug, Clone, PartialEq, Eq)]

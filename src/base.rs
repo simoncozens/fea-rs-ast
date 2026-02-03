@@ -4,8 +4,8 @@
 
 use crate::{AsFea, FeaTable, Table};
 use fea_rs::{
-    typed::{AstNode as _, ScriptRecord},
     Kind, NodeOrToken,
+    typed::{AstNode as _, ScriptRecord},
 };
 
 /// A min/max height record for a particular script and language
