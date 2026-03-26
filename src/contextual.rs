@@ -307,14 +307,14 @@ impl From<fea_rs::typed::Gpos8> for Statement {
 }
 
 /// Type marker that the statement is a positioning statement
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Pos;
 
 /// Type marker that the statement is a substitution statement
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Subst;
 /// A trait implemented by both Pos and Subst to allow generic handling
-pub trait SubOrPos: Display {}
+pub trait SubOrPos: Display + Copy {}
 impl SubOrPos for Pos {}
 impl SubOrPos for Subst {}
 impl Display for Pos {
