@@ -263,7 +263,7 @@ mod visitor;
 pub use contextual::*;
 pub use error::Error;
 pub use fea_rs;
-use fea_rs::{GlyphMap, NodeOrToken, ParseTree, parse::FileSystemResolver, typed::AstNode as _};
+use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, GlyphMap, NodeOrToken, ParseTree};
 pub use gdef::*;
 pub use glyphcontainers::*;
 pub use gpos::*;
@@ -290,6 +290,7 @@ pub trait AsFea {
 // treat them as a heterogeneous collection when we do visiting etc.
 // We split them up by context in later enums.
 /// An AST node representing a single statement in a feature file.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     // GSUB statements
@@ -780,6 +781,8 @@ pub enum ToplevelItem {
     ConditionSet(ConditionSet),
     /// A variation block for variable fonts: `variation rvrn heavy { ... } rvrn;`
     VariationBlock(VariationBlock),
+    /// A GDEF Glyph Class definition statement
+    GdefClassDef(GlyphClassDefStatement),
     // Tables
     /// A BASE table definition: `table BASE { ... } BASE;`
     Base(Table<Base>),
@@ -803,6 +806,7 @@ impl From<ToplevelItem> for Statement {
         match val {
             ToplevelItem::GlyphClassDefinition(gcd) => Statement::GlyphClassDefinition(gcd),
             ToplevelItem::MarkClassDefinition(gcd) => Statement::MarkClassDefinition(gcd),
+            ToplevelItem::GdefClassDef(gcds) => Statement::GdefClassDef(gcds),
 
             ToplevelItem::LanguageSystem(ls) => Statement::LanguageSystem(ls),
             ToplevelItem::Feature(fb) => Statement::FeatureBlock(fb),
@@ -830,6 +834,7 @@ impl TryFrom<Statement> for ToplevelItem {
         match value {
             Statement::GlyphClassDefinition(gcd) => Ok(ToplevelItem::GlyphClassDefinition(gcd)),
             Statement::MarkClassDefinition(mcd) => Ok(ToplevelItem::MarkClassDefinition(mcd)),
+            Statement::GdefClassDef(gcds) => Ok(ToplevelItem::GdefClassDef(gcds)),
             Statement::LanguageSystem(ls) => Ok(ToplevelItem::LanguageSystem(ls)),
             Statement::FeatureBlock(fb) => Ok(ToplevelItem::Feature(fb)),
             Statement::LookupBlock(lb) => Ok(ToplevelItem::Lookup(lb)),
@@ -856,6 +861,7 @@ impl AsFea for ToplevelItem {
         match self {
             ToplevelItem::GlyphClassDefinition(gcd) => gcd.as_fea(indent),
             ToplevelItem::MarkClassDefinition(mcd) => mcd.as_fea(indent),
+            ToplevelItem::GdefClassDef(gcds) => gcds.as_fea(indent),
             ToplevelItem::LanguageSystem(ls) => ls.as_fea(indent),
             ToplevelItem::Feature(fb) => fb.as_fea(indent),
             ToplevelItem::Lookup(lb) => lb.as_fea(indent),
