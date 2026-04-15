@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    Kind,
     typed::{AstNode as _, LocationSpec, LocationValue, Number},
+    Kind,
 };
 use indexmap::IndexMap;
 use smol_str::SmolStr;
@@ -10,6 +10,7 @@ use smol_str::SmolStr;
 use crate::AsFea;
 
 /// A metric, which is potentially variable.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Metric {
     /// A simple scalar metric
@@ -119,6 +120,7 @@ impl AsFea for Metric {
 
 type DeviceTable = Vec<(u8, i8)>;
 /// A `ValueRecord` element, used inside a `pos` rule to change a glyph's position
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecord {
     /// The horizontal placement adjustment
@@ -441,13 +443,18 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
         }
     }
 
-    if table.is_empty() { None } else { Some(table) }
+    if table.is_empty() {
+        None
+    } else {
+        Some(table)
+    }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.
 ///
 /// If a `name` is given, this will be used in preference to the coordinates.
 /// Other values should be integer.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Anchor {
     /// The horizontal coordinate of the anchor

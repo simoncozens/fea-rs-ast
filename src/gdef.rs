@@ -5,6 +5,7 @@ use fea_rs::typed::AstNode as _;
 use crate::{AsFea, Comment, GlyphContainer, Statement};
 
 /// A ``GDEF`` table ``Attach`` statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachStatement {
     /// The glyphs to which the attachment points apply
@@ -57,6 +58,7 @@ impl From<fea_rs::typed::GdefAttach> for AttachStatement {
 ///
 /// The four parameters represent base glyphs, ligature glyphs, mark glyphs,
 /// and component glyphs respectively. Any parameter can be None.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlyphClassDefStatement {
     /// The base glyphs class (or None)
@@ -149,6 +151,7 @@ impl From<fea_rs::typed::GdefClassDef> for GlyphClassDefStatement {
 }
 
 /// A ``GDEF`` table ``LigatureCaretByIndex`` statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureCaretByIndexStatement {
     /// The glyphs to which the caret indices apply
@@ -205,6 +208,7 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByIndexStatement {
 }
 
 /// A ``GDEF`` table ``LigatureCaretByPos`` statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureCaretByPosStatement {
     /// The glyphs to which the caret positions apply
@@ -257,6 +261,7 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByPosStatement {
 }
 
 /// A statement in a `table GDEF { ... } GDEF` block
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GdefStatement {
     /// A ``GDEF`` table ``Attach`` statement

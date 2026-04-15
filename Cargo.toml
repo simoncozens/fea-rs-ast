@@ -11,12 +11,7 @@ documentation = "https://docs.rs/fea-rs-ast"
 readme = "README.md"
 keywords = ["opentype", "fonts", "fea", "fonttools", "typography"]
 categories = ["parser-implementations", "text-processing"]
-exclude = [
-    "/.github",
-    "/test-data",
-    "*.py",
-    "*.fea",
-]
+exclude = ["/.github", "/test-data", "*.py", "*.fea"]
 
 [dependencies]
 fea-rs = "0.22.0"
@@ -26,6 +21,11 @@ thiserror = "2.0.17"
 read-fonts = "0.36.0"
 itertools = "0.14.0"
 indexmap = "2.12.1"
+serde = { version = "1.0", optional = true, features = ["derive"] }
+
+[features]
+default = []
+serde = ["dep:serde", "smol_str/serde", "indexmap/serde"]
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

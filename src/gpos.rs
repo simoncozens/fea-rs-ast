@@ -11,6 +11,7 @@ use crate::{
 };
 
 /// A single positioning rule (GPOS type 1)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePosStatement {
     /// The glyphs and their associated value records to be positioned
@@ -108,6 +109,7 @@ impl From<fea_rs::typed::Gpos1> for SinglePosStatement {
 }
 
 /// A pair positioning rule (GPOS type 2)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairPosStatement {
     /// The first glyph or class in the pair
@@ -206,6 +208,7 @@ impl From<fea_rs::typed::Gpos2> for PairPosStatement {
 }
 
 /// A cursive positioning rule (GPOS type 3)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CursivePosStatement {
     /// The location of the statement in the source feature file
@@ -272,6 +275,7 @@ impl From<fea_rs::typed::Gpos3> for CursivePosStatement {
 /// A mark-to-base positioning rule (GPOS type 4)
 ///
 /// Example: `pos base a <anchor 625 1800> mark @TOP_MARKS;`
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkBasePosStatement {
     /// The base glyph or class
@@ -358,6 +362,7 @@ impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
 /// and is made up of a list of (Anchor, MarkClass) tuples for that component.
 ///
 /// Example: `pos ligature lam_meem_jeem <anchor 625 1800> mark @TOP_MARKS ligComponent <anchor 376 -378> mark @BOTTOM_MARKS;`
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkLigPosStatement {
     /// The ligature glyph or class
@@ -460,6 +465,7 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
 }
 
 /// A mark-to-mark positioning rule (GPOS type 6)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkMarkPosStatement {
     /// The base glyph or class to which the marks will be attached

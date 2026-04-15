@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// A named anchor definition. (2.e.viii)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchorDefinition {
     /// The X coordinate of the anchor
@@ -73,6 +74,7 @@ impl From<fea_rs::typed::AnchorDef> for AnchorDefinition {
 }
 
 /// A comment in a feature file
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Comment {
     /// The text of the comment, which should include the initial `#`.
@@ -96,6 +98,7 @@ impl From<&str> for Comment {
 }
 
 /// Example: `feature salt;`
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeatureReferenceStatement {
     /// The name of the referenced feature
@@ -129,6 +132,7 @@ impl From<fea_rs::typed::FeatureRef> for FeatureReferenceStatement {
 ///
 /// `revision` should be a number, and will be formatted to three
 /// significant decimal places.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct FontRevisionStatement {
     /// The font revision number
@@ -166,6 +170,7 @@ impl Eq for FontRevisionStatement {}
 /// A glyph class definition
 ///
 /// Example: `@UPPERCASE = [A-Z];`
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlyphClassDefinition {
     /// class name as a string, without initial ``@``
@@ -209,6 +214,7 @@ impl From<fea_rs::typed::GlyphClassDef> for GlyphClassDefinition {
 }
 
 /// A ``language`` statement within a feature
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageStatement {
     /// The OpenType language tag for the language
@@ -264,6 +270,7 @@ impl From<fea_rs::typed::Language> for LanguageStatement {
 }
 
 /// A top-level ``languagesystem`` statement.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageSystemStatement {
     /// The OpenType script tag for the script
@@ -296,6 +303,7 @@ impl From<fea_rs::typed::LanguageSystem> for LanguageSystemStatement {
 }
 
 /// Represents a ``lookup ...;`` statement to include a lookup in a feature.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupReferenceStatement {
     /// The name of the lookup to include
@@ -336,6 +344,7 @@ impl From<fea_rs::typed::LookupRef> for LookupReferenceStatement {
 }
 
 /// A ``script`` statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptStatement {
     /// The OpenType script tag for the script
@@ -366,6 +375,7 @@ impl From<fea_rs::typed::Script> for ScriptStatement {
 }
 
 /// Represents a subtable break
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubtableStatement;
 impl SubtableStatement {
@@ -387,6 +397,7 @@ impl AsFea for SubtableStatement {
 /// Note: `range_start` and `range_end` are stored in **points** internally,
 /// but the FEA format uses **decipoints** (tenths of a point). The conversion
 /// is handled automatically during parsing and serialization.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SizeParameters {
     /// Design size in points
@@ -496,6 +507,7 @@ impl From<fea_rs::typed::Parameters> for SizeParameters {
 ///     wght 700 900;
 /// } heavy;
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConditionSet {
     /// The name of this conditionset
@@ -597,6 +609,7 @@ impl AsFea for ConditionSet {
 ///     lookup symbols_heavy;
 /// } rvrn;
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VariationBlock {
     /// The feature tag for this variation
@@ -693,6 +706,7 @@ impl AsFea for VariationBlock {
 }
 
 /// A ``lookupflag`` statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupFlagStatement {
     /// The value of the flag
@@ -790,6 +804,7 @@ impl From<fea_rs::typed::LookupFlag> for LookupFlagStatement {
 ///
 /// See the notes for [`MarkClass`] to understand how this differs from the
 /// Python `fontTools` representation.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkClassDefinition {
     /// The name of the mark class
@@ -841,6 +856,7 @@ impl From<fea_rs::typed::MarkClassDef> for MarkClassDefinition {
 }
 
 /// Represents a named value record definition.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValueRecordDefinition {
     /// The name of the value record

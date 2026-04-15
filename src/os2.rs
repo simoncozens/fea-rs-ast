@@ -8,6 +8,7 @@ use smol_str::SmolStr;
 
 use crate::{AsFea, Comment, FeaTable, Table};
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Os2Field {
     Comment(Comment),
@@ -167,6 +168,7 @@ impl From<Os2TableItem> for Os2Statement {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Os2Statement {
     field: Os2Field,
@@ -177,6 +179,7 @@ impl AsFea for Os2Statement {
         self.field.as_fea(indent)
     }
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Os2;
 impl FeaTable for Os2 {

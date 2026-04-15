@@ -61,6 +61,7 @@ const FEA_KEYWORDS: [&str; 52] = [
 ];
 
 /// A single glyph name, such as `cedilla`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GlyphName {
     /// The name itself as a string
@@ -97,6 +98,7 @@ impl AsFea for GlyphName {
 }
 
 /// A glyph class literal, such as `[a b c]` or `[a-z A-Z]`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GlyphClass {
     /// The glyphs in the class literal
@@ -166,6 +168,7 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
 }
 
 /// A glyph range, such as `a-z` or `A01-A05`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GlyphRange {
     /// Start glyph name of the range
@@ -268,6 +271,7 @@ impl AsFea for GlyphRange {
 
 /// A container for glyphs in various forms: single glyph names, glyph classes,
 /// glyph ranges, or glyph name/range literals.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GlyphContainer {
     /// A single glyph name
@@ -365,6 +369,7 @@ impl GlyphContainer {
 /// and the glyphs and their anchor points is stored at the feature file level.
 ///
 /// The name should not begin with `@`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MarkClass {
     /// The name of the mark class, without the leading `@`

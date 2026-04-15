@@ -9,6 +9,7 @@ use fea_rs::{
 };
 
 /// A min/max height record for a particular script and language
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MinMax {
     pub script: String,
@@ -50,6 +51,7 @@ impl From<fea_rs::typed::BaseMinMax> for MinMax {
         }
     }
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseScript {
     pub script_tag: String,
@@ -93,6 +95,7 @@ impl From<fea_rs::typed::ScriptRecord> for BaseScript {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseAxis {
     pub bases: Vec<String>,
@@ -153,6 +156,7 @@ impl AsFea for BaseAxis {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Base;
 impl FeaTable for Base {

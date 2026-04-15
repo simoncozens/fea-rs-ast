@@ -291,6 +291,7 @@ pub trait AsFea {
 // We split them up by context in later enums.
 /// An AST node representing a single statement in a feature file.
 #[allow(clippy::large_enum_variant)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     // GSUB statements
@@ -557,6 +558,7 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
 }
 
 /// A named feature block. (`feature foo { ... } foo;`)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeatureBlock {
     /// The name of the feature (also called the tag)
@@ -621,6 +623,7 @@ impl From<fea_rs::typed::Feature> for FeatureBlock {
 }
 
 /// A named lookup block. (`lookup foo { ... } foo;`)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupBlock {
     /// The name of the lookup
@@ -689,6 +692,7 @@ impl From<fea_rs::typed::LookupBlock> for LookupBlock {
 }
 
 /// A nested block containing statements (e.g., `featureNames { ... };`)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NestedBlock {
     /// The tag identifying the block type
@@ -758,6 +762,7 @@ impl From<fea_rs::typed::FeatureNames> for NestedBlock {
 /// This is a subset of [`Statement`] containing only constructs that are
 /// valid at the top level, excluding statements that can only appear within
 /// features, lookups, or table definitions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToplevelItem {
     /// A glyph class definition: `@lowercase = [a b c];`
@@ -940,6 +945,8 @@ fn to_toplevel_item(child: &NodeOrToken) -> Option<ToplevelItem> {
 /// let fea_code = "languagesystem DFLT dflt;";
 /// let feature_file = FeatureFile::try_from(fea_code).unwrap();
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeatureFile {
     /// The top-level statements in the feature file
     pub statements: Vec<ToplevelItem>,

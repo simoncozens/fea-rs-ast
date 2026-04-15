@@ -207,6 +207,7 @@ dependencies = [
  "pretty_assertions",
  "read-fonts",
  "rstest",
+ "serde",
  "smol_str",
  "thiserror",
 ]

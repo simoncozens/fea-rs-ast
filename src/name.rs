@@ -6,6 +6,7 @@ use crate::AsFea;
 use read_fonts::tables::name::Encoding;
 
 /// Kind of name record.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameRecordKind {
     /// A standard name record with a specific name ID
@@ -23,6 +24,7 @@ pub enum NameRecordKind {
 /// Example: `nameid 9 "Joachim M\00fcller-Lanc\00e9";`
 ///
 /// The string field contains the raw string with escape sequences already processed.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameRecord {
     /// Platform ID

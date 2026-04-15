@@ -10,6 +10,7 @@ use crate::{
 use std::ops::Range;
 
 /// A single substitution (GSUB type 1) statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SingleSubstStatement {
     /// The location of the statement in the source FEA.
@@ -112,6 +113,7 @@ impl From<fea_rs::typed::Gsub1> for SingleSubstStatement {
 }
 
 /// A multiple substitution (GSUB type 2) statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MultipleSubstStatement {
     /// The location of the statement in the source FEA.
@@ -252,6 +254,7 @@ fn inline_sub_targets(val: &fea_rs::Node) -> Vec<GlyphContainer> {
 }
 
 /// An alternate substitution (GSUB type 3) statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlternateSubstStatement {
     /// The location of the statement in the source FEA.
@@ -342,6 +345,7 @@ impl From<fea_rs::typed::Gsub3> for AlternateSubstStatement {
 }
 
 /// A ligature substitution (GSUB type 4) statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureSubstStatement {
     /// The location of the statement in the source FEA.
@@ -437,6 +441,7 @@ impl From<fea_rs::typed::Gsub4> for LigatureSubstStatement {
 }
 
 /// A reverse chaining substitution statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReverseChainSingleSubstStatement {
     /// The location of the statement in the source FEA.

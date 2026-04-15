@@ -6,6 +6,7 @@ use smol_str::SmolStr;
 use crate::{AsFea, NameRecord, NameRecordKind, SHIFT, parse_namespec};
 
 /// A STAT table Design Axis
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatDesignAxisStatement {
     pub tag: SmolStr,
@@ -73,6 +74,7 @@ impl From<fea_rs::typed::StatDesignAxis> for StatDesignAxisStatement {
 }
 
 /// STAT table ElidedFallbackNameID
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ElidedFallbackNameId {
     /// an int pointing to an existing name table name ID
@@ -87,6 +89,7 @@ impl AsFea for ElidedFallbackNameId {
 }
 
 /// STAT table ElidedFallbackName
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ElidedFallbackName {
     pub names: Vec<NameRecord>,
@@ -154,6 +157,7 @@ impl From<fea_rs::typed::StatElidedFallbackName> for StatStatement {
 ///     flag ElidableAxisValueName;
 /// };
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct STATAxisValueStatement {
     /// Name records for this axis value
@@ -255,6 +259,7 @@ impl AsFea for STATAxisValueStatement {
 /// - Single value: `location wdth 100;`
 /// - Linked value: `location wdth 100 150;`
 /// - Min/max range: `location opsz 8 5 9;` (nominal, min, max)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct AxisValueLocationStatement {
     /// The axis tag (e.g., "wdth", "wght", "opsz")
@@ -320,6 +325,7 @@ impl AsFea for AxisValueLocationStatement {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatStatement {
     Comment(crate::Comment),

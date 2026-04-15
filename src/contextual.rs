@@ -57,6 +57,7 @@ pub(crate) fn context_glyphs(val: &fea_rs::Node) -> Vec<GlyphContainer> {
 }
 
 /// A chained contextual substitution statement, either GSUB or GPOS.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainedContextStatement<T: SubOrPos> {
     /// The location of the statement in the source FEA.
@@ -307,10 +308,12 @@ impl From<fea_rs::typed::Gpos8> for Statement {
 }
 
 /// Type marker that the statement is a positioning statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Pos;
 
 /// Type marker that the statement is a substitution statement
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Subst;
 /// A trait implemented by both Pos and Subst to allow generic handling
@@ -329,6 +332,7 @@ impl Display for Subst {
 }
 
 /// Either a GPOS or GSUB ignore statement.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IgnoreStatement<T: SubOrPos> {
     /// The location of the statement in the source FEA.

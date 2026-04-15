@@ -1,9 +1,9 @@
 use std::ops::Range;
 
-use fea_rs::{NodeOrToken, typed::AstNode};
+use fea_rs::{typed::AstNode, NodeOrToken};
 
 use crate::{
-    AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT, stat::StatStatement,
+    stat::StatStatement, AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT,
 };
 
 /// A helper for constructing tables which hold statements of a particular type.
@@ -25,6 +25,14 @@ pub trait FeaTable {
 }
 
 /// A table in a feature file, parameterized by the type of statements it contains.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "T::Statement: serde::Serialize",
+        deserialize = "T::Statement: serde::Deserialize<'de>"
+    ))
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table<T: FeaTable> {
     /// The statements in this table.
@@ -44,6 +52,7 @@ impl<T: FeaTable> AsFea for Table<T> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `GDEF` table
 pub struct Gdef;
@@ -87,6 +96,7 @@ impl From<fea_rs::typed::GdefTable> for Table<Gdef> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `head` table
 pub struct Head;
@@ -108,6 +118,7 @@ impl FeaTable for Head {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// A statement in the `head` table
 pub enum HeadStatement {
@@ -133,6 +144,7 @@ impl From<fea_rs::typed::HeadTable> for Table<Head> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `name` table
 pub struct Name;
@@ -155,6 +167,7 @@ impl FeaTable for Name {
 }
 
 /// A statement in the `name` table
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameStatement {
     /// A comment
@@ -179,6 +192,7 @@ impl From<fea_rs::typed::NameTable> for Table<Name> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `STAT` table
 pub struct Stat;
@@ -214,6 +228,7 @@ impl From<fea_rs::typed::StatTable> for Table<Stat> {
 
 // hhea
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Fields in the `hhea` table
 pub enum HheaField {
@@ -241,6 +256,7 @@ impl AsFea for HheaField {
 }
 
 /// A statement in the `hhea` table
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HheaStatement {
     /// The field of this statement
@@ -291,6 +307,7 @@ impl From<fea_rs::typed::HheaTable> for Table<Hhea> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `hhea` table
 pub struct Hhea;
@@ -316,6 +333,7 @@ impl FeaTable for Hhea {
 // vhea
 
 /// A field in the `vhea` table
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VheaField {
     /// A comment
@@ -338,6 +356,7 @@ impl AsFea for VheaField {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// A statement in the `vhea` table
 pub struct VheaStatement {
@@ -386,6 +405,7 @@ impl From<fea_rs::typed::VheaTable> for Table<Vhea> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// The `vhea` table
 pub struct Vhea;
