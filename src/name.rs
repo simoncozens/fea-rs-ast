@@ -38,6 +38,7 @@ pub struct NameRecord {
     /// Kind of the name record
     pub kind: NameRecordKind,
     /// Location in the source FEA file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 

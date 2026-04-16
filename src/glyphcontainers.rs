@@ -104,6 +104,13 @@ pub struct GlyphClass {
     /// The glyphs in the class literal
     pub glyphs: Vec<GlyphContainer>,
     /// The location of the glyph class in the source feature file
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 impl GlyphClass {
@@ -271,7 +278,6 @@ impl AsFea for GlyphRange {
 
 /// A container for glyphs in various forms: single glyph names, glyph classes,
 /// glyph ranges, or glyph name/range literals.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GlyphContainer {
     /// A single glyph name
@@ -355,6 +361,78 @@ impl GlyphContainer {
         match self {
             GlyphContainer::GlyphClass(gcs) => gcs.glyphs.is_empty(),
             _ => false,
+        }
+    }
+}
+
+/// Custom serde serialization for GlyphContainer that serializes GlyphName variants as plain strings
+#[cfg(feature = "serde")]
+mod glyph_container_serde {
+    use super::*;
+    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+
+    impl Serialize for super::GlyphContainer {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match self {
+                super::GlyphContainer::GlyphName(gn) => {
+                    // Serialize GlyphName directly as a string
+                    serializer.serialize_str(&gn.name)
+                }
+                super::GlyphContainer::GlyphClass(gc) => gc.serialize(serializer),
+                super::GlyphContainer::GlyphClassName(name) => {
+                    // Serialize as { "GlyphClassName": name_str }
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry("GlyphClassName", name)?;
+                    map.end()
+                }
+                super::GlyphContainer::GlyphRange(gr) => gr.serialize(serializer),
+                super::GlyphContainer::GlyphNameOrRange(name) => {
+                    // Serialize as { "GlyphNameOrRange": name_str }
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry("GlyphNameOrRange", name)?;
+                    map.end()
+                }
+            }
+        }
+    }
+
+    impl<'de> Deserialize<'de> for super::GlyphContainer {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            #[serde(untagged)]
+            enum GlyphContainerEnum {
+                String(String),
+                GlyphClass(GlyphClass),
+                GlyphClassName {
+                    #[serde(rename = "GlyphClassName")]
+                    glyph_class_name: SmolStr,
+                },
+                GlyphRange(GlyphRange),
+                GlyphNameOrRange {
+                    #[serde(rename = "GlyphNameOrRange")]
+                    glyph_name_or_range: SmolStr,
+                },
+            }
+
+            match GlyphContainerEnum::deserialize(deserializer)? {
+                GlyphContainerEnum::String(s) => {
+                    Ok(super::GlyphContainer::GlyphName(GlyphName::new(&s)))
+                }
+                GlyphContainerEnum::GlyphClass(gc) => Ok(super::GlyphContainer::GlyphClass(gc)),
+                GlyphContainerEnum::GlyphClassName {
+                    glyph_class_name: cn,
+                } => Ok(super::GlyphContainer::GlyphClassName(cn)),
+                GlyphContainerEnum::GlyphRange(gr) => Ok(super::GlyphContainer::GlyphRange(gr)),
+                GlyphContainerEnum::GlyphNameOrRange {
+                    glyph_name_or_range: nor,
+                } => Ok(super::GlyphContainer::GlyphNameOrRange(nor)),
+            }
         }
     }
 }

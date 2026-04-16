@@ -61,10 +61,13 @@ pub(crate) fn context_glyphs(val: &fea_rs::Node) -> Vec<GlyphContainer> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainedContextStatement<T: SubOrPos> {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// Input glyphs
     pub glyphs: Vec<GlyphContainer>,
@@ -336,6 +339,7 @@ impl Display for Subst {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IgnoreStatement<T: SubOrPos> {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The chain contexts: a list of (prefix, glyphs, suffix) tuples.
     pub chain_contexts: Vec<(

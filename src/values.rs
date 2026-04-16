@@ -142,6 +142,7 @@ pub struct ValueRecord {
     /// Whether this is a vertical value record
     pub vertical: bool,
     /// The location of the value record in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// An optional name for the value record
     ///
@@ -470,6 +471,7 @@ pub struct Anchor {
     /// The optional vertical device table
     pub y_device_table: Option<DeviceTable>,
     /// The location of the anchor in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 

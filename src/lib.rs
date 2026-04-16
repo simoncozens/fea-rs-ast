@@ -279,6 +279,18 @@ use crate::{base::Base, os2::Os2};
 
 pub(crate) const SHIFT: &str = "    ";
 
+/// Helper function for serde: return default Range<usize> (0..0)
+#[cfg(feature = "serde")]
+pub(crate) fn default_range() -> Range<usize> {
+    0..0
+}
+
+/// Helper function for serde: check if a Range<usize> is the default (0..0)
+#[cfg(feature = "serde")]
+pub(crate) fn is_default_range(r: &Range<usize>) -> bool {
+    r.start == 0 && r.end == 0
+}
+
 /// Trait for converting AST nodes back to feature file syntax.
 pub trait AsFea {
     /// Convert the AST node to feature file syntax with the given indentation.
@@ -568,6 +580,13 @@ pub struct FeatureBlock {
     /// Whether the feature uses `useExtension`
     pub use_extension: bool,
     /// The position of the feature block in the source
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub pos: Range<usize>,
 }
 
@@ -633,6 +652,13 @@ pub struct LookupBlock {
     /// Whether the lookup should be placed in a separate extension subtable
     pub use_extension: bool,
     /// The position of the lookup block in the source
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub pos: Range<usize>,
 }
 
@@ -700,6 +726,13 @@ pub struct NestedBlock {
     /// The statements contained in the block
     pub statements: Vec<Statement>,
     /// The position of the block in the source
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub pos: Range<usize>,
 }
 

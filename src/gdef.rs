@@ -13,6 +13,7 @@ pub struct AttachStatement {
     /// The contour point indices
     pub contour_points: Vec<usize>,
     /// The location of the statement in the source
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl AttachStatement {
@@ -70,6 +71,7 @@ pub struct GlyphClassDefStatement {
     /// The component glyphs class (or None)
     pub component_glyphs: Option<GlyphContainer>,
     /// The location of the statement in the source
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 
@@ -159,6 +161,7 @@ pub struct LigatureCaretByIndexStatement {
     /// The caret indices
     pub carets: Vec<usize>,
     /// The location of the statement in the source
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 
@@ -216,6 +219,7 @@ pub struct LigatureCaretByPosStatement {
     /// The caret positions
     pub carets: Vec<i16>,
     /// The location of the statement in the source
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 

@@ -21,6 +21,7 @@ pub struct AnchorDefinition {
     /// The name of the anchor
     pub name: String,
     /// The location of the anchor definition in the source FEA
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl AnchorDefinition {
@@ -178,6 +179,7 @@ pub struct GlyphClassDefinition {
     /// The glyphs in the class
     pub glyphs: GlyphClass,
     /// The location of the definition in the source feature file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl GlyphClassDefinition {
@@ -312,6 +314,7 @@ pub struct LookupReferenceStatement {
     /// lookup rather than a `LookupBlock` object.
     pub lookup_name: String,
     /// The location of the statement in the source feature file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl LookupReferenceStatement {
@@ -409,6 +412,7 @@ pub struct SizeParameters {
     /// Range end in points (FEA format stores as decipoints, divided by 10 on read)
     pub range_end: f64,
     /// Location in the source FEA file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl Eq for SizeParameters {}
@@ -515,6 +519,7 @@ pub struct ConditionSet {
     /// A map of axis tags to (min, max) userspace coordinates
     pub conditions: Vec<(String, f32, f32)>,
     /// Location in the source FEA file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl Eq for ConditionSet {}
@@ -621,6 +626,7 @@ pub struct VariationBlock {
     /// Whether to use extension subtables
     pub use_extension: bool,
     /// Location in the source FEA file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 
@@ -716,6 +722,7 @@ pub struct LookupFlagStatement {
     /// Optional UseMarkFilteringSet
     pub mark_filtering_set: Option<GlyphContainer>,
     /// Location in the source FEA file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 
@@ -864,6 +871,7 @@ pub struct ValueRecordDefinition {
     /// The value record data
     pub value: ValueRecord,
     /// The location of the definition in the source feature file
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
 }
 impl ValueRecordDefinition {

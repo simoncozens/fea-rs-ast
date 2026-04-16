@@ -14,10 +14,13 @@ use std::ops::Range;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SingleSubstStatement {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// The glyphs to be substituted
     ///
@@ -117,10 +120,13 @@ impl From<fea_rs::typed::Gsub1> for SingleSubstStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MultipleSubstStatement {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// The glyph to be substituted
     pub glyph: GlyphContainer,
@@ -258,10 +264,13 @@ fn inline_sub_targets(val: &fea_rs::Node) -> Vec<GlyphContainer> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlternateSubstStatement {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// The glyph to be substituted
     pub glyph: GlyphContainer,
@@ -349,10 +358,13 @@ impl From<fea_rs::typed::Gsub3> for AlternateSubstStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LigatureSubstStatement {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// The glyphs to be substituted
     pub glyphs: Vec<GlyphContainer>,
@@ -445,10 +457,13 @@ impl From<fea_rs::typed::Gsub4> for LigatureSubstStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReverseChainSingleSubstStatement {
     /// The location of the statement in the source FEA.
+    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
     /// The prefix (backtrack) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub suffix: Vec<GlyphContainer>,
     /// The glyphs to be substituted
     pub glyphs: Vec<GlyphContainer>,

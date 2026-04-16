@@ -30,3 +30,4 @@ serde = ["dep:serde", "smol_str/serde", "indexmap/serde"]
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 rstest = "0.26.1"
+serde_json = "1.0"
