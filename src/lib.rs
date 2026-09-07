@@ -1020,7 +1020,9 @@ impl FeatureFile {
         glyph_names: Option<&[&str]>,
         project_root: Option<impl Into<PathBuf>>,
     ) -> Result<Self, crate::Error> {
-        let glyph_map = glyph_names.map(|gn| GlyphMap::from_iter(gn.iter().cloned()));
+        let glyph_map = glyph_names
+            .map(|gn| GlyphMap::new(gn.iter().cloned()))
+            .transpose()?;
         let resolver: Box<dyn fea_rs::parse::SourceResolver> =
             if let Some(project_root) = project_root {
                 let path = project_root.into();

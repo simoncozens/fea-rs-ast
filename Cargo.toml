@@ -1,6 +1,6 @@
 [package]
 name = "fea-rs-ast"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2024"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
 description = "fontTools-like AST wrapper around fea-rs parser"
@@ -14,7 +14,7 @@ categories = ["parser-implementations", "text-processing"]
 exclude = ["/.github", "/test-data", "*.py", "*.fea"]
 
 [dependencies]
-fea-rs = "0.22.0"
+fea-rs = "1.0.0"
 log = "0.4.28"
 smol_str = "0.3.4"
 thiserror = "2.0.17"

@@ -12,4 +12,7 @@ pub enum Error {
     /// Errors encountered during feature parsing
     #[error("Errors encountered during feature parsing: {0:?}")]
     FeatureParsing(fea_rs::DiagnosticSet),
+    /// Errors encountered building glyph order
+    #[error("Errors encountered building glyph order: {0:?}")]
+    GlyphOrderBuilding(#[from] fea_rs::compile::error::GlyphOrderError),
 }
