@@ -1,9 +1,9 @@
 use std::ops::Range;
 
-use fea_rs::{typed::AstNode, NodeOrToken};
+use fea_rs::{NodeOrToken, typed::AstNode};
 
 use crate::{
-    stat::StatStatement, AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT,
+    AsFea, Comment, FontRevisionStatement, GdefStatement, NameRecord, SHIFT, stat::StatStatement,
 };
 
 /// A helper for constructing tables which hold statements of a particular type.
@@ -262,7 +262,13 @@ pub struct HheaStatement {
     /// The field of this statement
     pub field: HheaField,
     /// The location of this statement in the source
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 impl AsFea for HheaStatement {

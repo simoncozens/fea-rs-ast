@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, Float, LocationSpec, LocationValue, Number},
     Kind,
+    typed::{AstNode as _, Float, LocationSpec, LocationValue, Number},
 };
 use indexmap::IndexMap;
 use ordered_float::OrderedFloat;
@@ -144,7 +144,13 @@ pub struct ValueRecord {
     /// Whether this is a vertical value record
     pub vertical: bool,
     /// The location of the value record in the source FEA.
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
     /// An optional name for the value record
     ///
@@ -446,11 +452,7 @@ fn from_device(device: fea_rs::typed::Device) -> Option<DeviceTable> {
         }
     }
 
-    if table.is_empty() {
-        None
-    } else {
-        Some(table)
-    }
+    if table.is_empty() { None } else { Some(table) }
 }
 
 /// An `Anchor` element, used inside a `pos` rule.
@@ -473,7 +475,13 @@ pub struct Anchor {
     /// The optional vertical device table
     pub y_device_table: Option<DeviceTable>,
     /// The location of the anchor in the source FEA.
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 

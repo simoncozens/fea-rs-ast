@@ -17,15 +17,27 @@ pub struct SinglePosStatement {
     /// The glyphs and their associated value records to be positioned
     pub pos: Vec<(GlyphContainer, Option<ValueRecord>)>,
     /// The prefix (backtrack) glyphs
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub prefix: Vec<GlyphContainer>,
     /// The suffix (lookahead) glyphs
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub suffix: Vec<GlyphContainer>,
     /// Whether to force this statement to be treated as a contextual positioning rule
     pub force_chain: bool,
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -126,7 +138,13 @@ pub struct PairPosStatement {
     /// Whether this is an enumerated pair positioning rule
     pub enumerated: bool,
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -216,7 +234,13 @@ impl From<fea_rs::typed::Gpos2> for PairPosStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CursivePosStatement {
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
     /// The glyph or class this rule applies to
     pub glyphclass: GlyphContainer,
@@ -288,7 +312,13 @@ pub struct MarkBasePosStatement {
     /// The list of (Anchor, MarkClass) tuples for the marks
     pub marks: Vec<(Option<Anchor>, MarkClass)>,
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -379,7 +409,13 @@ pub struct MarkLigPosStatement {
     /// The list of lists of (Anchor, MarkClass) tuples for each component
     pub marks: Vec<Vec<(Option<Anchor>, MarkClass)>>,
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -486,7 +522,13 @@ pub struct MarkMarkPosStatement {
     /// The list of (Anchor, MarkClass) tuples for the marks
     pub marks: Vec<(Option<Anchor>, MarkClass)>,
     /// The location of the statement in the source feature file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 

@@ -12,7 +12,13 @@ pub struct StatDesignAxisStatement {
     pub tag: SmolStr,
     pub axis_order: usize,
     pub names: Vec<NameRecord>,
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -80,7 +86,13 @@ impl From<fea_rs::typed::StatDesignAxis> for StatDesignAxisStatement {
 pub struct ElidedFallbackNameId {
     /// an int pointing to an existing name table name ID
     pub value: u16,
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -95,7 +107,13 @@ impl AsFea for ElidedFallbackNameId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ElidedFallbackName {
     pub names: Vec<NameRecord>,
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
@@ -170,7 +188,13 @@ pub struct STATAxisValueStatement {
     /// Flags (bitfield: 0x01 = OlderSiblingFontAttribute, 0x02 = ElidableAxisValueName)
     pub flags: u16,
     /// Location in the source FEA file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 impl Eq for STATAxisValueStatement {}
@@ -271,7 +295,13 @@ pub struct AxisValueLocationStatement {
     /// Location values (1-3 floats depending on format)
     pub values: Vec<f32>,
     /// Location in the source FEA file
-    #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
     pub location: Range<usize>,
 }
 
