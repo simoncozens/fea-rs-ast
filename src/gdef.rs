@@ -324,6 +324,7 @@ impl TryFrom<Statement> for GdefStatement {
 mod tests {
     use super::*;
     use crate::{GlyphClass, GlyphName};
+    use ordered_float::OrderedFloat;
 
     #[test]
     fn test_roundtrip_ligature_caret_by_index() {
@@ -396,8 +397,8 @@ mod tests {
         let stmt = LigatureCaretByPosStatement::new(
             GlyphContainer::GlyphName(GlyphName::new("f_i")),
             vec![Metric::Variable(vec![
-                ([("wght".into(), 100)].into_iter().collect(), 200),
-                ([("wght".into(), 900)].into_iter().collect(), 250),
+                ([("wght".into(), OrderedFloat(100.0))].into_iter().collect(), 200),
+                ([("wght".into(), OrderedFloat(900.0))].into_iter().collect(), 250),
             ])],
             0..0,
         );
