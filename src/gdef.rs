@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use fea_rs::typed::AstNode as _;
 
-use crate::{AsFea, Comment, GlyphContainer, Statement};
+use crate::{AsFea, Comment, GlyphContainer, Metric, Statement};
 
 /// A ``GDEF`` table ``Attach`` statement
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -217,7 +217,7 @@ pub struct LigatureCaretByPosStatement {
     /// The glyphs to which the caret positions apply
     pub glyphs: GlyphContainer,
     /// The caret positions
-    pub carets: Vec<i16>,
+    pub carets: Vec<Metric>,
     /// The location of the statement in the source
     #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
@@ -225,7 +225,7 @@ pub struct LigatureCaretByPosStatement {
 
 impl LigatureCaretByPosStatement {
     /// Creates a new `LigatureCaretByPos` statement.
-    pub fn new(glyphs: GlyphContainer, carets: Vec<i16>, location: Range<usize>) -> Self {
+    pub fn new(glyphs: GlyphContainer, carets: Vec<Metric>, location: Range<usize>) -> Self {
         Self {
             glyphs,
             carets,
@@ -239,7 +239,7 @@ impl AsFea for LigatureCaretByPosStatement {
         let carets = self
             .carets
             .iter()
-            .map(|c| c.to_string())
+            .map(|c| c.as_fea(""))
             .collect::<Vec<_>>()
             .join(" ");
         format!("LigatureCaretByPos {} {};", self.glyphs.as_fea(""), carets)
@@ -254,10 +254,10 @@ impl From<fea_rs::typed::GdefLigatureCaret> for LigatureCaretByPosStatement {
             .unwrap();
 
         // Extract the caret positions as signed integers
-        let carets: Vec<i16> = val
+        let carets: Vec<Metric> = val
             .iter()
             .filter(|t| t.kind() == fea_rs::Kind::Number)
-            .map(|t| t.as_token().unwrap().text.parse().unwrap())
+            .map(|t| Metric::Scalar(t.as_token().unwrap().text.parse().unwrap()))
             .collect();
 
         LigatureCaretByPosStatement::new(glyphs.into(), carets, val.node().range())
@@ -324,6 +324,7 @@ impl TryFrom<Statement> for GdefStatement {
 mod tests {
     use super::*;
     use crate::{GlyphClass, GlyphName};
+    use ordered_float::OrderedFloat;
 
     #[test]
     fn test_roundtrip_ligature_caret_by_index() {
@@ -361,7 +362,7 @@ mod tests {
             .unwrap();
         let stmt = LigatureCaretByPosStatement::from(ligature_caret);
         assert_eq!(stmt.glyphs.as_fea(""), "f_f_i");
-        assert_eq!(stmt.carets, vec![200, 400]);
+        assert_eq!(stmt.carets, vec![Metric::Scalar(200), Metric::Scalar(400)]);
         assert_eq!(stmt.as_fea(""), "LigatureCaretByPos f_f_i 200 400;");
     }
 
@@ -385,10 +386,26 @@ mod tests {
                 ],
                 0..0,
             )),
-            vec![200, 400],
+            vec![Metric::Scalar(200), Metric::Scalar(400)],
             0..0,
         );
         assert_eq!(stmt.as_fea(""), "LigatureCaretByPos [f_f_i f_f_l] 200 400;");
+    }
+
+    #[test]
+    fn test_generate_variable_ligature_caret_by_pos() {
+        let stmt = LigatureCaretByPosStatement::new(
+            GlyphContainer::GlyphName(GlyphName::new("f_i")),
+            vec![Metric::Variable(vec![
+                ([("wght".into(), OrderedFloat(100.0))].into_iter().collect(), 200),
+                ([("wght".into(), OrderedFloat(900.0))].into_iter().collect(), 250),
+            ])],
+            0..0,
+        );
+        assert_eq!(
+            stmt.as_fea(""),
+            "LigatureCaretByPos f_i (wght=100:200 wght=900:250);"
+        );
     }
 
     #[test]

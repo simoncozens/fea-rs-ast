@@ -286,7 +286,7 @@ pub struct MarkBasePosStatement {
     /// The base glyph or class
     pub base: GlyphContainer,
     /// The list of (Anchor, MarkClass) tuples for the marks
-    pub marks: Vec<(Anchor, MarkClass)>,
+    pub marks: Vec<(Option<Anchor>, MarkClass)>,
     /// The location of the statement in the source feature file
     #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
@@ -296,7 +296,7 @@ impl MarkBasePosStatement {
     /// Create a new mark-to-base positioning statement.
     pub fn new(
         base: GlyphContainer,
-        marks: Vec<(Anchor, MarkClass)>,
+        marks: Vec<(Option<Anchor>, MarkClass)>,
         location: Range<usize>,
     ) -> Self {
         Self {
@@ -314,7 +314,10 @@ impl AsFea for MarkBasePosStatement {
             res.push_str(&format!(
                 "\n{}    {} mark @{}",
                 indent,
-                anchor.as_fea(""),
+                anchor
+                    .as_ref()
+                    .map(|a| a.as_fea(""))
+                    .unwrap_or_else(|| "<anchor NULL>".to_string()),
                 mark_class.name
             ));
         }
@@ -335,7 +338,7 @@ impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
             .into();
 
         // Extract all AnchorMark nodes (after the base glyph)
-        let marks: Vec<(Anchor, MarkClass)> = val
+        let marks: Vec<(Option<Anchor>, MarkClass)> = val
             .iter()
             .filter_map(fea_rs::typed::AnchorMark::cast)
             .map(|anchor_mark| {
@@ -344,7 +347,7 @@ impl From<fea_rs::typed::Gpos4> for MarkBasePosStatement {
                     .iter()
                     .find_map(fea_rs::typed::Anchor::cast)
                     .unwrap();
-                let anchor = from_anchor(anchor_node).unwrap();
+                let anchor = from_anchor(anchor_node);
 
                 // Get the mark class name (it's a @GlyphClass token)
                 let mark_class_node = anchor_mark
@@ -374,7 +377,7 @@ pub struct MarkLigPosStatement {
     /// The ligature glyph or class
     pub ligatures: GlyphContainer,
     /// The list of lists of (Anchor, MarkClass) tuples for each component
-    pub marks: Vec<Vec<(Anchor, MarkClass)>>,
+    pub marks: Vec<Vec<(Option<Anchor>, MarkClass)>>,
     /// The location of the statement in the source feature file
     #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
@@ -384,7 +387,7 @@ impl MarkLigPosStatement {
     /// Create a new mark-to-ligature positioning statement.
     pub fn new(
         ligatures: GlyphContainer,
-        marks: Vec<Vec<(Anchor, MarkClass)>>,
+        marks: Vec<Vec<(Option<Anchor>, MarkClass)>>,
         location: Range<usize>,
     ) -> Self {
         Self {
@@ -411,7 +414,10 @@ impl AsFea for MarkLigPosStatement {
                     temp.push_str(&format!(
                         "\n{}    {} mark @{}",
                         indent,
-                        anchor.as_fea(""),
+                        anchor
+                            .as_ref()
+                            .map(|a| a.as_fea(""))
+                            .unwrap_or_else(|| "<anchor NULL>".to_string()),
                         mark_class.name
                     ));
                 }
@@ -438,7 +444,7 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
             .into();
 
         // Extract all LigatureComponent nodes
-        let marks: Vec<Vec<(Anchor, MarkClass)>> = val
+        let marks: Vec<Vec<(Option<Anchor>, MarkClass)>> = val
             .iter()
             .filter_map(fea_rs::typed::LigatureComponent::cast)
             .map(|lig_component| {
@@ -452,7 +458,7 @@ impl From<fea_rs::typed::Gpos5> for MarkLigPosStatement {
                             .iter()
                             .find_map(fea_rs::typed::Anchor::cast)
                             .unwrap();
-                        let anchor = from_anchor(anchor_node)?;
+                        let anchor = from_anchor(anchor_node);
 
                         // Get the mark class name (it's a @GlyphClass token)
                         let mark_class_node = anchor_mark
@@ -478,7 +484,7 @@ pub struct MarkMarkPosStatement {
     /// The base glyph or class to which the marks will be attached
     pub base_marks: GlyphContainer,
     /// The list of (Anchor, MarkClass) tuples for the marks
-    pub marks: Vec<(Anchor, MarkClass)>,
+    pub marks: Vec<(Option<Anchor>, MarkClass)>,
     /// The location of the statement in the source feature file
     #[cfg_attr(feature = "serde", serde(default = "crate::default_range", skip_serializing_if = "crate::is_default_range"))]
     pub location: Range<usize>,
@@ -488,7 +494,7 @@ impl MarkMarkPosStatement {
     /// Create a new mark-to-mark positioning statement.
     pub fn new(
         base_marks: GlyphContainer,
-        marks: Vec<(Anchor, MarkClass)>,
+        marks: Vec<(Option<Anchor>, MarkClass)>,
         location: Range<usize>,
     ) -> Self {
         Self {
@@ -506,7 +512,10 @@ impl AsFea for MarkMarkPosStatement {
             res.push_str(&format!(
                 "\n{}    {} mark @{}",
                 indent,
-                anchor.as_fea(""),
+                anchor
+                    .as_ref()
+                    .map(|a| a.as_fea(""))
+                    .unwrap_or_else(|| "<anchor NULL>".to_string()),
                 mark_class.name
             ));
         }
@@ -527,7 +536,7 @@ impl From<fea_rs::typed::Gpos6> for MarkMarkPosStatement {
             .into();
 
         // Extract all AnchorMark nodes (after the base mark glyph)
-        let marks: Vec<(Anchor, MarkClass)> = val
+        let marks: Vec<(Option<Anchor>, MarkClass)> = val
             .iter()
             .filter_map(fea_rs::typed::AnchorMark::cast)
             .map(|anchor_mark| {
@@ -536,7 +545,7 @@ impl From<fea_rs::typed::Gpos6> for MarkMarkPosStatement {
                     .iter()
                     .find_map(fea_rs::typed::Anchor::cast)
                     .unwrap();
-                let anchor = from_anchor(anchor_node).unwrap();
+                let anchor = from_anchor(anchor_node);
 
                 // Get the mark class name (it's a @GlyphClass token)
                 let mark_class_node = anchor_mark
@@ -725,11 +734,11 @@ mod tests {
             GlyphContainer::GlyphName(GlyphName::new("a")),
             vec![
                 (
-                    Anchor::new_simple(300, 450, 0..0),
+                    Some(Anchor::new_simple(300, 450, 0..0)),
                     MarkClass::new("TOP_MARKS"),
                 ),
                 (
-                    Anchor::new_simple(300, -100, 0..0),
+                    Some(Anchor::new_simple(300, -100, 0..0)),
                     MarkClass::new("BOTTOM_MARKS"),
                 ),
             ],
@@ -770,11 +779,11 @@ mod tests {
             GlyphContainer::GlyphName(GlyphName::new("lam_meem_jeem")),
             vec![
                 vec![(
-                    Anchor::new_simple(625, 1800, 0..0),
+                    Some(Anchor::new_simple(625, 1800, 0..0)),
                     MarkClass::new("TOP_MARKS"),
                 )],
                 vec![(
-                    Anchor::new_simple(376, -378, 0..0),
+                    Some(Anchor::new_simple(376, -378, 0..0)),
                     MarkClass::new("BOTTOM_MARKS"),
                 )],
                 vec![], // Empty component (NULL anchor)

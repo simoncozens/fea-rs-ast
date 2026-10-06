@@ -263,6 +263,7 @@ mod visitor;
 pub use contextual::*;
 pub use error::Error;
 pub use fea_rs;
+pub use ordered_float;
 use fea_rs::{parse::FileSystemResolver, typed::AstNode as _, GlyphMap, NodeOrToken, ParseTree};
 pub use gdef::*;
 pub use glyphcontainers::*;
@@ -398,6 +399,8 @@ pub enum Statement {
     LookupBlock(LookupBlock),
     /// A nested block (e.g., `featureNames { ... };`)
     NestedBlock(NestedBlock),
+    /// A `Character` statement in a `cvParameters` block: `Character 0x5dde;`
+    Character(CharacterStatement),
     // GDEF-related statements
     /// A GDEF Attach statement: `Attach a 1 2 3;`
     GdefAttach(AttachStatement),
@@ -464,6 +467,7 @@ impl AsFea for Statement {
             Statement::FeatureBlock(fb) => fb.as_fea(indent),
             Statement::LookupBlock(lb) => lb.as_fea(indent),
             Statement::NestedBlock(nb) => nb.as_fea(indent),
+            Statement::Character(c) => c.as_fea(indent),
         }
     }
 }
@@ -552,6 +556,8 @@ fn to_statement(child: &NodeOrToken) -> Option<Statement> {
         Some(Statement::SizeParameters(sizeparams.into()))
     } else if let Some(featurenames) = fea_rs::typed::FeatureNames::cast(child) {
         Some(Statement::NestedBlock(featurenames.into()))
+    } else if let Some(cv_parameters) = fea_rs::typed::CvParameters::cast(child) {
+        Some(Statement::NestedBlock(cv_parameters.into()))
     // Doesn't exist in fea_rs AST!
     // } else if let Some(subtable) = fea_rs::typed::Subtable::cast(child) {
     //     Some(Statement::Subtable(SubtableStatement::new()))
@@ -610,7 +616,11 @@ impl FeatureBlock {
 impl AsFea for FeatureBlock {
     fn as_fea(&self, indent: &str) -> String {
         let mut res = String::new();
-        res.push_str(&format!("{}feature {} {{\n", indent, self.name));
+        res.push_str(&format!("{}feature {}", indent, self.name));
+        if self.use_extension {
+            res.push_str(" useExtension");
+        }
+        res.push_str(" {\n");
         let mid_indent = indent.to_string() + SHIFT;
         res.push_str(&format!(
             "{}\n",
@@ -682,7 +692,11 @@ impl LookupBlock {
 impl AsFea for LookupBlock {
     fn as_fea(&self, indent: &str) -> String {
         let mut res = String::new();
-        res.push_str(&format!("{}lookup {} {{\n", indent, self.name));
+        res.push_str(&format!("{}lookup {}", indent, self.name));
+        if self.use_extension {
+            res.push_str(" useExtension");
+        }
+        res.push_str(" {\n");
         let mid_indent = indent.to_string() + SHIFT;
         res.push_str(&format!(
             "{mid_indent}{}\n",
@@ -784,6 +798,72 @@ impl From<fea_rs::typed::FeatureNames> for NestedBlock {
             .collect();
         NestedBlock {
             tag: SmolStr::new("featureNames"),
+            statements,
+            pos: val.node().range(),
+        }
+    }
+}
+
+impl From<fea_rs::typed::CvParameters> for NestedBlock {
+    fn from(val: fea_rs::typed::CvParameters) -> Self {
+        let statements: Vec<Statement> = val
+            .node()
+            .iter_children()
+            .filter_map(|child| {
+                if child.kind() == fea_rs::Kind::Comment {
+                    return Some(Statement::Comment(Comment::from(
+                        child.token_text().unwrap(),
+                    )));
+                }
+                if let Some(name) = fea_rs::typed::CvParametersName::cast(child) {
+                    Some(Statement::NestedBlock(name.into()))
+                } else {
+                    fea_rs::typed::CvParametersChar::cast(child)
+                        .map(|character| Statement::Character(character.into()))
+                }
+            })
+            .collect();
+        NestedBlock {
+            tag: SmolStr::new("cvParameters"),
+            statements,
+            pos: val.node().range(),
+        }
+    }
+}
+
+impl From<fea_rs::typed::CvParametersName> for NestedBlock {
+    fn from(val: fea_rs::typed::CvParametersName) -> Self {
+        let tag = val
+            .iter()
+            .next()
+            .and_then(|t| t.as_token())
+            .unwrap()
+            .text
+            .clone();
+        let statements: Vec<Statement> = val
+            .node()
+            .iter_children()
+            .filter_map(|child| {
+                if child.kind() == fea_rs::Kind::Comment {
+                    return Some(Statement::Comment(Comment::from(
+                        child.token_text().unwrap(),
+                    )));
+                }
+                fea_rs::typed::NameSpec::cast(child).map(|name_spec| {
+                    let (platform_id, plat_enc_id, lang_id, string) = parse_namespec(name_spec);
+                    Statement::FeatureNameStatement(NameRecord {
+                        platform_id,
+                        plat_enc_id,
+                        lang_id,
+                        string,
+                        kind: NameRecordKind::FeatureName,
+                        location: child.range(),
+                    })
+                })
+            })
+            .collect();
+        NestedBlock {
+            tag,
             statements,
             pos: val.node().range(),
         }

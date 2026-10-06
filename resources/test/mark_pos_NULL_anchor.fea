@@ -1,0 +1,19 @@
+languagesystem DFLT dflt;
+
+markClass [acute grave] <anchor 111 -11> @TOP_MARKS;
+markClass [cedilla] <anchor 222 22> @BOTTOM_MARKS;
+
+feature test {
+    pos base a
+        <anchor 11 1> mark @TOP_MARKS
+        <anchor NULL> mark @BOTTOM_MARKS;
+    pos base b
+        <anchor NULL> mark @TOP_MARKS;
+    pos ligature f_f
+            <anchor NULL> mark @TOP_MARKS
+            <anchor 12 -1> mark @BOTTOM_MARKS
+        ligComponent
+            <anchor NULL>;
+    pos mark cedilla
+        <anchor NULL> mark @TOP_MARKS;
+} test;

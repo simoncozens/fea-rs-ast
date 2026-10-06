@@ -3,7 +3,7 @@ use std::ops::Range;
 use fea_rs::typed::AstNode;
 
 use crate::AsFea;
-use read_fonts::tables::name::Encoding;
+use read_fonts::tables::name::MacRomanMapping;
 
 /// Kind of name record.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -63,25 +63,24 @@ impl NameRecord {
     }
 
     fn escape_string(&self) -> String {
-        let encoding = Encoding::new(self.platform_id, self.plat_enc_id);
-        let needs_escaping = |c| {
-            !(c >= 0x20 as char && c <= 0x7E as char && (c != 0x22 as char && c != 0x5c as char))
-        };
-        // Encode the string
-        self.string
-            .chars()
-            .map(|x| {
-                if needs_escaping(x) {
-                    if matches!(encoding, Encoding::Utf16Be) {
-                        format!(r"\{:04x}", x as u32)
-                    } else {
-                        format!(r"\{:02x}", x as u32)
-                    }
-                } else {
-                    x.to_string()
+        // Windows escapes are UTF-16 code units, and Macintosh ones are Mac Roman bytes
+        let is_mac = self.platform_id == 1;
+        let mut escaped = String::with_capacity(self.string.len());
+        for c in self.string.chars() {
+            if (' '..='~').contains(&c) && c != '"' && c != '\\' {
+                escaped.push(c);
+            } else if !is_mac {
+                for unit in c.encode_utf16(&mut [0; 2]) {
+                    escaped.push_str(&format!(r"\{:04x}", unit));
                 }
-            })
-            .collect()
+            } else if let Some(code) = MacRomanMapping.encode(c) {
+                escaped.push_str(&format!(r"\{:02x}", code));
+            } else {
+                // Preserve characters that Mac Roman cannot encode.
+                escaped.push(c);
+            }
+        }
+        escaped
     }
 }
 
@@ -159,7 +158,7 @@ pub(crate) fn parse_namespec(name_spec: fea_rs::typed::NameSpec) -> (u16, u16, u
         .map(|tok| {
             let s = tok.text.as_str();
             // Remove surrounding quotes and unescape
-            unescape_string(&s[1..s.len() - 1])
+            unescape_string(platform_id, &s[1..s.len() - 1])
         })
         .unwrap();
     (platform_id, plat_enc_id, lang_id, string)
@@ -177,45 +176,35 @@ fn parse_dec_oct_hex(node: &fea_rs::typed::DecOctHex) -> u16 {
     }
 }
 
-/// Unescape a FEA string (process \xxxx escape sequences)
-fn unescape_string(s: &str) -> String {
-    let mut result = String::new();
-    let mut chars = s.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            // FEA uses variable-length hex escapes, but we need to be careful
-            // Collect up to 4 hex digits (or until a non-hex character)
-            let mut hex = String::new();
-            for _ in 0..4 {
-                if let Some(&ch) = chars.peek() {
-                    if ch.is_ascii_hexdigit() {
-                        hex.push(ch);
-                        chars.next();
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
+/// Decode Windows UTF-16 escapes (`\XXXX`) or Macintosh Mac Roman escapes (`\XX`).
+fn unescape_string(platform_id: u16, s: &str) -> String {
+    let is_mac = platform_id == 1;
+    let escape_digits = if is_mac { 2 } else { 4 };
+    let mut units: Vec<u16> = Vec::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(pos) = rest.find('\\') {
+        units.extend(rest[..pos].encode_utf16());
+        rest = &rest[pos + 1..];
+        let code = rest
+            .get(..escape_digits)
+            .filter(|hex| hex.bytes().all(|b| b.is_ascii_hexdigit()))
+            .and_then(|hex| u16::from_str_radix(hex, 16).ok());
+        match code {
+            Some(code) if is_mac => {
+                let c = MacRomanMapping.decode(code as u8);
+                units.extend(c.encode_utf16(&mut [0; 2]).iter());
             }
-
-            if !hex.is_empty()
-                && let Ok(code) = u32::from_str_radix(&hex, 16)
-                && let Some(ch) = char::from_u32(code)
-            {
-                result.push(ch);
+            Some(code) => units.push(code),
+            None => {
+                // Preserve the backslash when the following text is not a valid escape.
+                units.push('\\' as u16);
                 continue;
             }
-            // If we couldn't parse it, just add the backslash and hex digits
-            result.push('\\');
-            result.push_str(&hex);
-        } else {
-            result.push(c);
         }
+        rest = &rest[escape_digits..];
     }
-
-    result
+    units.extend(rest.encode_utf16());
+    String::from_utf16_lossy(&units)
 }
 
 impl From<fea_rs::typed::SizeMenuName> for NameRecord {
@@ -307,6 +296,47 @@ mod tests {
             stmt.as_fea(""),
             r#"nameid 9 "Joachim M\00fcller-Lanc\00e9";"#
         );
+    }
+
+    #[test]
+    fn test_roundtrip_namerecord_with_mac_escapes() {
+        const FEA: &str = r#"table name { nameid 9 1 "Joachim M\9fller-Lanc\8e \22\5c"; } name;"#;
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let table = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::NameTable::cast)
+            .unwrap();
+        let name_rec = table
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::NameRecord::cast)
+            .unwrap();
+        let stmt = NameRecord::from(name_rec);
+        assert_eq!(stmt.string, "Joachim Müller-Lancé \"\\");
+        assert_eq!(
+            stmt.as_fea(""),
+            r#"nameid 9 1 "Joachim M\9fller-Lanc\8e \22\5c";"#
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_namerecord_with_windows_escapes() {
+        const FEA: &str = r#"table name { nameid 9 "\0022\005c\000a \d83d\de00"; } name;"#;
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let table = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::NameTable::cast)
+            .unwrap();
+        let name_rec = table
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::NameRecord::cast)
+            .unwrap();
+        let stmt = NameRecord::from(name_rec);
+        assert_eq!(stmt.string, "\"\\\n 😀");
+        assert_eq!(stmt.as_fea(""), r#"nameid 9 "\0022\005c\000a \d83d\de00";"#);
     }
 
     #[test]

@@ -1,10 +1,11 @@
 use std::ops::Range;
 
 use fea_rs::{
-    typed::{AstNode as _, LocationSpec, LocationValue, Number},
+    typed::{AstNode as _, Float, LocationSpec, LocationValue, Number},
     Kind,
 };
 use indexmap::IndexMap;
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 
 use crate::AsFea;
@@ -16,7 +17,7 @@ pub enum Metric {
     /// A simple scalar metric
     Scalar(i16),
     /// A variable metric with different values across the design space
-    Variable(Vec<(IndexMap<SmolStr, i16>, i16)>),
+    Variable(Vec<(IndexMap<SmolStr, OrderedFloat<f64>>, i16)>),
     /// A GlyphsAppNumber metric
     GlyphsAppNumber(String),
 }
@@ -35,7 +36,7 @@ impl std::hash::Hash for Metric {
                 for (location, value) in variations {
                     for (tag, coord) in location {
                         state.write(tag.as_bytes());
-                        state.write_i16(*coord);
+                        std::hash::Hash::hash(coord, state);
                     }
                     state.write_i16(*value);
                 }
@@ -75,7 +76,7 @@ impl From<fea_rs::typed::Metric> for Metric {
         }
     }
 }
-fn from_locationspec(val: &fea_rs::typed::LocationSpec) -> IndexMap<SmolStr, i16> {
+fn from_locationspec(val: &fea_rs::typed::LocationSpec) -> IndexMap<SmolStr, OrderedFloat<f64>> {
     let mut map = IndexMap::new();
     for item in val.iter().filter_map(fea_rs::typed::LocationSpecItem::cast) {
         let axis_tag = item.iter().find_map(fea_rs::typed::Tag::cast).unwrap();
@@ -87,8 +88,9 @@ fn from_locationspec(val: &fea_rs::typed::LocationSpec) -> IndexMap<SmolStr, i16
         let raw = axislocation.iter().next().unwrap();
         let value = Number::cast(raw)
             .map(|num| num.text().parse::<f64>().unwrap())
+            .or_else(|| Float::cast(raw).map(|num| num.text().parse::<f64>().unwrap()))
             .unwrap();
-        map.insert(axis_tag.token().as_str().into(), value as i16);
+        map.insert(axis_tag.token().as_str().into(), OrderedFloat(value));
     }
     map
 }
