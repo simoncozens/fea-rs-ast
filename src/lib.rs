@@ -616,7 +616,11 @@ impl FeatureBlock {
 impl AsFea for FeatureBlock {
     fn as_fea(&self, indent: &str) -> String {
         let mut res = String::new();
-        res.push_str(&format!("{}feature {} {{\n", indent, self.name));
+        res.push_str(&format!("{}feature {}", indent, self.name));
+        if self.use_extension {
+            res.push_str(" useExtension");
+        }
+        res.push_str(" {\n");
         let mid_indent = indent.to_string() + SHIFT;
         res.push_str(&format!(
             "{}\n",
@@ -688,7 +692,11 @@ impl LookupBlock {
 impl AsFea for LookupBlock {
     fn as_fea(&self, indent: &str) -> String {
         let mut res = String::new();
-        res.push_str(&format!("{}lookup {} {{\n", indent, self.name));
+        res.push_str(&format!("{}lookup {}", indent, self.name));
+        if self.use_extension {
+            res.push_str(" useExtension");
+        }
+        res.push_str(" {\n");
         let mid_indent = indent.to_string() + SHIFT;
         res.push_str(&format!(
             "{mid_indent}{}\n",
