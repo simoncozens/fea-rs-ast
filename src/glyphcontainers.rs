@@ -420,6 +420,18 @@ mod glyph_container_serde {
                     map.serialize_entry("GlyphNameOrRange", name)?;
                     map.end()
                 }
+                super::GlyphContainer::Cid(cid) => {
+                    // Serialize as { "Cid": cid_value }
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry("Cid", cid)?;
+                    map.end()
+                }
+                super::GlyphContainer::CidRange((start, end)) => {
+                    // Serialize as { "CidRange": [start, end] }
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry("CidRange", &(start, end))?;
+                    map.end()
+                }
             }
         }
     }
@@ -443,6 +455,14 @@ mod glyph_container_serde {
                     #[serde(rename = "GlyphNameOrRange")]
                     glyph_name_or_range: SmolStr,
                 },
+                Cid {
+                    #[serde(rename = "Cid")]
+                    cid: u32,
+                },
+                CidRange {
+                    #[serde(rename = "CidRange")]
+                    cid_range: (u32, u32),
+                },
             }
 
             match GlyphContainerEnum::deserialize(deserializer)? {
@@ -457,6 +477,10 @@ mod glyph_container_serde {
                 GlyphContainerEnum::GlyphNameOrRange {
                     glyph_name_or_range: nor,
                 } => Ok(super::GlyphContainer::GlyphNameOrRange(nor)),
+                GlyphContainerEnum::Cid { cid } => Ok(super::GlyphContainer::Cid(cid)),
+                GlyphContainerEnum::CidRange {
+                    cid_range: (start, end),
+                } => Ok(super::GlyphContainer::CidRange((start, end))),
             }
         }
     }
