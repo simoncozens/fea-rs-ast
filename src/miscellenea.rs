@@ -503,6 +503,53 @@ impl From<fea_rs::typed::Parameters> for SizeParameters {
     }
 }
 
+/// A `Character` statement in a `cvParameters` block: `Character 0x5dde;`
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CharacterStatement {
+    /// Unicode code point.
+    pub character: u32,
+    /// The location of the statement in the source FEA
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "crate::default_range",
+            skip_serializing_if = "crate::is_default_range"
+        )
+    )]
+    pub location: Range<usize>,
+}
+
+impl CharacterStatement {
+    /// Create a new `Character` statement.
+    pub fn new(character: u32, location: Range<usize>) -> Self {
+        Self {
+            character,
+            location,
+        }
+    }
+}
+
+impl AsFea for CharacterStatement {
+    fn as_fea(&self, _indent: &str) -> String {
+        format!("Character {:#x};", self.character)
+    }
+}
+
+impl From<fea_rs::typed::CvParametersChar> for CharacterStatement {
+    fn from(val: fea_rs::typed::CvParametersChar) -> Self {
+        use fea_rs::typed::DecOctHex;
+        let character = match val.iter().find_map(DecOctHex::cast).unwrap() {
+            DecOctHex::Decimal(num) => num.text().parse().unwrap(),
+            DecOctHex::Octal(num) => u32::from_str_radix(num.text(), 8).unwrap(),
+            DecOctHex::Hex(num) => {
+                u32::from_str_radix(num.text().trim_start_matches("0x"), 16).unwrap()
+            }
+        };
+        CharacterStatement::new(character, val.node().range())
+    }
+}
+
 /// A variable layout conditionset.
 ///
 /// Example:
