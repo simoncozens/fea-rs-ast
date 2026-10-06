@@ -147,6 +147,21 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
                 if let Some(gc) = fea_rs::typed::GlyphOrClass::cast(child) {
                     Some(gc.into())
                 } else if let Some(gr) = fea_rs::typed::GlyphRange::cast(child) {
+                    // These might be CIDs
+                    if gr.iter().find_map(fea_rs::typed::Cid::cast).is_some() {
+                        let start = gr
+                            .iter()
+                            .find_map(fea_rs::typed::Cid::cast)
+                            .map(|cid| cid.text().parse::<u32>().unwrap())
+                            .unwrap();
+                        let end = gr
+                            .iter()
+                            .skip_while(|t| t.kind() != fea_rs::Kind::Hyphen)
+                            .find_map(fea_rs::typed::Cid::cast)
+                            .map(|cid| cid.text().parse::<u32>().unwrap())
+                            .unwrap();
+                        return Some(GlyphContainer::CidRange((start, end)));
+                    }
                     let start = gr
                         .iter()
                         .find_map(fea_rs::typed::GlyphName::cast)
@@ -239,10 +254,8 @@ impl GlyphRange {
                     })
                     .collect();
                 return glyphs.into_iter();
-            } else {
-                // invalid range
-                return vec![self.start.clone(), self.end.clone()].into_iter();
             }
+            // Otherwise fall through: a single differing digit is a numeric range
         }
         // So it should be a 1 to 3 digit number
         let start_num: Option<usize> = start_core.parse().ok();
@@ -290,6 +303,10 @@ pub enum GlyphContainer {
     GlyphRange(GlyphRange),
     /// An ambiguity: either a glyph name or range literal, up to the user to resolve
     GlyphNameOrRange(SmolStr),
+    /// A CID glyph ID
+    Cid(u32),
+    /// A CID glyph ID range
+    CidRange((u32, u32)),
 }
 
 impl AsFea for GlyphContainer {
@@ -309,6 +326,8 @@ impl AsFea for GlyphContainer {
             }
             GlyphContainer::GlyphRange(range) => range.as_fea(""),
             GlyphContainer::GlyphNameOrRange(name_or_range) => name_or_range.to_string(),
+            GlyphContainer::Cid(cid) => format!("\\{}", cid),
+            GlyphContainer::CidRange((start, end)) => format!("\\{} - \\{}", start, end),
         }
     }
 }
@@ -320,7 +339,13 @@ impl From<fea_rs::typed::GlyphOrClass> for GlyphContainer {
             GlyphOrClass::Class(glyph_class_literal) => {
                 GlyphContainer::GlyphClass(glyph_class_literal.into())
             }
-            GlyphOrClass::Cid(_cid) => todo!(),
+            GlyphOrClass::Cid(cid) => {
+                if let Ok(parsed_cid) = cid.text().parse() {
+                    GlyphContainer::Cid(parsed_cid)
+                } else {
+                    GlyphContainer::GlyphName(GlyphName::new(&format!("cid{:04}", cid.text())))
+                }
+            }
             GlyphOrClass::NamedClass(glyph_class_name) => {
                 GlyphContainer::GlyphClassName(SmolStr::new(glyph_class_name.text()))
             }
@@ -369,7 +394,7 @@ impl GlyphContainer {
 #[cfg(feature = "serde")]
 mod glyph_container_serde {
     use super::*;
-    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeMap};
 
     impl Serialize for super::GlyphContainer {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
