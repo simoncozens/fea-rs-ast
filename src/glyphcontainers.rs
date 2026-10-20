@@ -407,7 +407,7 @@ impl GlyphContainer {
 #[cfg(feature = "serde")]
 mod glyph_container_serde {
     use super::*;
-    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeMap};
 
     impl Serialize for super::GlyphContainer {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -445,6 +445,12 @@ mod glyph_container_serde {
                     map.serialize_entry("CidRange", &(start, end))?;
                     map.end()
                 }
+                super::GlyphContainer::GlyphsPredicateClass(pc) => {
+                    // Serialize as { "GlyphsPredicateClass": pc_value }
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry("GlyphsPredicateClass", pc)?;
+                    map.end()
+                }
             }
         }
     }
@@ -476,6 +482,10 @@ mod glyph_container_serde {
                     #[serde(rename = "CidRange")]
                     cid_range: (u32, u32),
                 },
+                GlyphsPredicateClass {
+                    #[serde(rename = "GlyphsPredicateClass")]
+                    pc: SmolStr,
+                },
             }
 
             match GlyphContainerEnum::deserialize(deserializer)? {
@@ -494,6 +504,9 @@ mod glyph_container_serde {
                 GlyphContainerEnum::CidRange {
                     cid_range: (start, end),
                 } => Ok(super::GlyphContainer::CidRange((start, end))),
+                GlyphContainerEnum::GlyphsPredicateClass { pc } => {
+                    Ok(super::GlyphContainer::GlyphsPredicateClass(pc))
+                }
             }
         }
     }
