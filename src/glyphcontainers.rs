@@ -180,7 +180,17 @@ impl From<fea_rs::typed::GlyphClassLiteral> for GlyphClass {
                     Some(GlyphContainer::GlyphNameOrRange(
                         child.token_text().unwrap().into(),
                     ))
+                } else if child.kind() == fea_rs::Kind::GlyphsPredicateNode {
+                    let contents: String = child
+                        .as_node()
+                        .map(|node| {
+                            node.iter_tokens()
+                                .fold(String::new(), |acc, t| acc + t.text.as_ref())
+                        })
+                        .unwrap_or_default();
+                    Some(GlyphContainer::GlyphsPredicateClass(contents.into()))
                 } else {
+                    log::warn!("Unrecognized child in GlyphClassLiteral: {:?}", child);
                     None
                 }
             })
@@ -307,6 +317,8 @@ pub enum GlyphContainer {
     Cid(u32),
     /// A CID glyph ID range
     CidRange((u32, u32)),
+    /// A Glyphs predicate-based class (`$[..]`)
+    GlyphsPredicateClass(SmolStr),
 }
 
 impl AsFea for GlyphContainer {
@@ -328,6 +340,7 @@ impl AsFea for GlyphContainer {
             GlyphContainer::GlyphNameOrRange(name_or_range) => name_or_range.to_string(),
             GlyphContainer::Cid(cid) => format!("\\{}", cid),
             GlyphContainer::CidRange((start, end)) => format!("\\{} - \\{}", start, end),
+            GlyphContainer::GlyphsPredicateClass(predicate) => predicate.to_string(),
         }
     }
 }
@@ -394,7 +407,7 @@ impl GlyphContainer {
 #[cfg(feature = "serde")]
 mod glyph_container_serde {
     use super::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeMap};
+    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
     impl Serialize for super::GlyphContainer {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -583,5 +596,25 @@ mod tests {
                 SmolStr::new("cet"),
             ]
         );
+    }
+
+    #[test]
+    fn test_glyphs_predicate() {
+        const FEA: &str = "@foo = [$[name contains \"-ar.init\"]];";
+        let (parsed, _) = fea_rs::parse::parse_string(FEA);
+        let definition = parsed
+            .root()
+            .iter_children()
+            .find_map(fea_rs::typed::GlyphClassDef::cast)
+            .unwrap();
+        let literal = definition
+            .node()
+            .iter_children()
+            .find_map(fea_rs::typed::GlyphClassLiteral::cast)
+            .unwrap();
+        println!("{:#?}", literal);
+        let glyphs: GlyphClass = literal.into();
+        println!("{:#?}", glyphs);
+        assert_eq!(glyphs.glyphs.len(), 1);
     }
 }
