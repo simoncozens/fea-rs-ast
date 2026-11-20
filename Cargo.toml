@@ -1,12 +1,11 @@
 [package]
 name = "fea-rs-ast"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
 description = "fontTools-like AST wrapper around fea-rs parser"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/simoncozens/fea-rs-ast"
-homepage = "https://github.com/simoncozens/fea-rs-ast"
 documentation = "https://docs.rs/fea-rs-ast"
 readme = "README.md"
 keywords = ["opentype", "fonts", "fea", "fonttools", "typography"]
@@ -14,12 +13,14 @@ categories = ["parser-implementations", "text-processing"]
 exclude = ["/.github", "/test-data", "*.py", "*.fea"]
 
 [dependencies]
-fea-rs = "1.0.0"
+fea-rs = "2.0.0"
+# To avoid multiple libraries, keep this aligned with the version of read-fonts
+# used by the write-fonts dependency of fea-rs...
+read-fonts = "0.46.0"
+
 log = "0.4.28"
 smol_str = "0.3.4"
 thiserror = "2.0.17"
-read-fonts = "0.36.0"
-itertools = "0.14.0"
 indexmap = "2.12.1"
 ordered-float = "5.1.0"
 serde = { version = "1.0", optional = true, features = ["derive"] }
